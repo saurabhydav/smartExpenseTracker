@@ -1,0 +1,53 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: expense-tracker-backend
+  
+  # Database Configuration (Aiven Cloud MySQL)
+  datasource:
+    # URL format: jdbc:mysql://<Host>:<Port>/<Database>?sslMode=<SSL_Mode>
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://mysql-3b5649af-saurabhyadav16091-68f0.l.aivencloud.com:16609/defaultdb?sslMode=REQUIRED}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${SPRING_DATASOURCE_USERNAME:avnadmin}
+    password: ${SPRING_DATASOURCE_PASSWORD:YOUR_AIVEN_PASSWORD}
+
+  # JPA Configuration
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQL8Dialect
+  
+  # Kafka Configuration (disabled by default for local dev)
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: expense-tracker-group
+      auto-offset-reset: earliest
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:your-super-secret-key-for-development-only-change-in-production}
+  access-token-expiry: 900000      # 15 minutes in milliseconds
+  refresh-token-expiry: 604800000  # 7 days in milliseconds
+
+# Kafka Topics
+kafka:
+  topics:
+    user-lifecycle: user-lifecycle
+    backup-audit: backup-audit
+  enabled: false  # Set to true when Kafka is available
+
+# Logging
+logging:
+  level:
+    com.expensetracker: DEBUG
+    org.springframework.security: DEBUG

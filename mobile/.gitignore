@@ -1,0 +1,7 @@
+# Mobile
+build/
+android/app/build/
+android/.gradle/
+
+# Dependencies
+node_modules/
