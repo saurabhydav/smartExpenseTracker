@@ -57,18 +57,15 @@ npm run android  # or npm run ios
 
 ## Tech Stack
 
-**Mobile:**
+Mobile:
 - React Native + TypeScript
 - SQLite (react-native-quick-sqlite)
 - Zustand for state management
 - React Navigation
 
-**Backend:**
+Backend:
 - Spring Boot 3.2
 - Spring Security + JWT
 - MySQL + JPA
 - Apache Kafka (optional)
 
-## License
-
-MIT
