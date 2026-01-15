@@ -8,7 +8,7 @@ A local-first, privacy-focused expense tracking application with on-device AI pr
 ┌─────────────────────────────────────────────────────────────┐
 │                    Mobile App (React Native)                 │
 ├─────────────────────────────────────────────────────────────┤
-│  SMS Receiver  │  Gemini Nano AI  │  SQLite  │  Biometrics  │
+│  SMS Receiver       │       SQLite       │      Biometrics  │
 └───────────────────────────┬─────────────────────────────────┘
                             │ Auth Only
                             ▼
