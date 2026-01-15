@@ -22,6 +22,7 @@ export interface Transaction {
   date: string;
   rawSms: string | null;
   notes: string | null;
+  originalMerchant: string | null; // Added to store raw SMS name
   createdAt: string;
 }
 
@@ -41,6 +42,7 @@ export interface Subscription {
   nextDate: string;
   isActive: boolean;
   userId: number; // Added userId
+  originalMerchant: string | null; // Added to store raw SMS name
   createdAt: string;
 }
 
@@ -68,6 +70,7 @@ export const CREATE_TABLES_SQL = [
   date TEXT NOT NULL,
   raw_sms TEXT,
   notes TEXT,
+  original_merchant TEXT,
   created_at TEXT DEFAULT (datetime('now'))
 )`,
 
@@ -88,7 +91,9 @@ export const CREATE_TABLES_SQL = [
   next_date TEXT NOT NULL,
   is_active INTEGER DEFAULT 1,
   user_id INTEGER,
-  created_at TEXT DEFAULT (datetime('now'))
+  original_merchant TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(merchant, user_id)
 )`,
 
   `CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date)`,

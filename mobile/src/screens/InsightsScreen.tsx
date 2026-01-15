@@ -37,6 +37,7 @@ export default function InsightsScreen() {
     const [burnRate, setBurnRate] = useState<BurnRateData | null>(null);
     const [insights, setInsights] = useState<SpendingInsight[]>([]);
     const [subscriptions, setSubscriptions] = useState<DetectedSubscription[]>([]);
+    const [monthlyCost, setMonthlyCost] = useState(0);
     const [chartData, setChartData] = useState<{ date: string; amount: number }[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isExporting, setIsExporting] = useState(false);
@@ -59,8 +60,10 @@ export default function InsightsScreen() {
             const insightsList = await generateInsights(user.id, totalBudget > 0 ? totalBudget : undefined);
             setInsights(insightsList);
 
-            const subs = await getActiveSubscriptions(); // Needs update?
+            const subs = await getActiveSubscriptions(user.id); // Needs update?
             setSubscriptions(subs);
+            const cost = await getMonthlySubscriptionCost(user.id);
+            setMonthlyCost(cost);
 
             const chart = await getChartData(user.id, 30);
             setChartData(chart);
@@ -73,8 +76,11 @@ export default function InsightsScreen() {
     const handleDetectSubscriptions = async () => {
         setIsLoading(true);
         try {
-            const detected = await detectSubscriptions();
+            const detected = await detectSubscriptions(user?.id || 0);
             setSubscriptions(detected);
+            // Also update cost
+            const cost = await getMonthlySubscriptionCost(user?.id || 0);
+            setMonthlyCost(cost);
             Alert.alert('Complete', `Found ${detected.length} recurring payments`);
         } catch (error) {
             Alert.alert('Error', 'Failed to detect subscriptions');
@@ -260,7 +266,7 @@ export default function InsightsScreen() {
                         <View style={styles.subscriptionTotal}>
                             <Text style={styles.subscriptionTotalLabel}>Monthly Total</Text>
                             <Text style={styles.subscriptionTotalValue}>
-                                {formatCurrency(getMonthlySubscriptionCost())}
+                                {formatCurrency(monthlyCost)}
                             </Text>
                         </View>
 

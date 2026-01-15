@@ -193,9 +193,13 @@ export async function updateAllTransactionsForMerchant(
     categoryId: number | null
 ): Promise<void> {
     const db = getDatabase();
+    // Fix: Update based on original_merchant (stable ID) OR merchant (display name)
+    // This handles both new schema (original_merchant) and old schema (merchant)
     await db.executeSql(
-        'UPDATE transactions SET merchant = ?, category_id = ? WHERE UPPER(merchant) = UPPER(?)',
-        [displayName, categoryId, rawName]
+        `UPDATE transactions 
+         SET merchant = ?, category_id = ? 
+         WHERE UPPER(original_merchant) = UPPER(?) OR UPPER(merchant) = UPPER(?)`,
+        [displayName, categoryId, rawName, rawName]
     );
 }
 
@@ -345,6 +349,7 @@ export async function processSmartSms(
         date: parsed.date,
         rawSms: sms,
         notes: null,
+        originalMerchant: parsed.merchant, // Store raw name as stable ID
     });
 
     console.log(`Transaction saved with ID: ${transactionId} `);
@@ -469,13 +474,13 @@ export async function getUnnamedMerchants(userId: number): Promise<{ rawName: st
     const db = getDatabase();
 
     const [result] = await db.executeSql(`
-    SELECT t.merchant as raw_name,
+    SELECT COALESCE(t.original_merchant, t.merchant) as raw_name,
     COUNT(*) as count,
     MAX(t.amount) as last_amount
     FROM transactions t
-    LEFT JOIN merchant_mapping m ON UPPER(t.merchant) = UPPER(m.sms_name) AND m.user_id = ?
+    LEFT JOIN merchant_mapping m ON UPPER(COALESCE(t.original_merchant, t.merchant)) = UPPER(m.sms_name) AND m.user_id = ?
     WHERE m.id IS NULL AND t.user_id = ?
-        GROUP BY UPPER(t.merchant)
+        GROUP BY UPPER(COALESCE(t.original_merchant, t.merchant))
     ORDER BY count DESC
     `, [userId, userId]);
 

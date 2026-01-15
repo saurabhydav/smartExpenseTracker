@@ -6,7 +6,7 @@ import * as Keychain from 'react-native-keychain';
 // API base URL - configure for your environment
 const API_BASE_URL = __DEV__
     ? 'http://10.80.173.232:8080' // Physical device local IP
-    : 'https://api.expensetracker.com';
+    : 'https://smartexpensetracker-bjlu.onrender.com';
 
 const TOKEN_SERVICE = 'ExpenseTrackerAuth';
 

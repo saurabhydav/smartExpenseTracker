@@ -28,7 +28,7 @@ interface BiometricLockScreenProps {
 export default function BiometricLockScreen({ onUnlock }: BiometricLockScreenProps) {
     const [biometryType, setBiometryType] = useState<string | null>(null);
     const [isAuthenticating, setIsAuthenticating] = useState(false);
-    const [attempts, setAttempts] = useState(0);
+
 
     useEffect(() => {
         checkBiometrics();
@@ -73,10 +73,10 @@ export default function BiometricLockScreen({ onUnlock }: BiometricLockScreenPro
             if (success) {
                 // Save unlock time
                 await AsyncStorage.setItem(LAST_UNLOCK_KEY, Date.now().toString());
-                setAttempts(0);
+
                 onUnlock();
             } else {
-                setAttempts(prev => prev + 1);
+
                 // Removed max attempts limit as per user request
             }
         } catch (error: any) {
@@ -143,11 +143,7 @@ export default function BiometricLockScreen({ onUnlock }: BiometricLockScreenPro
                     </Text>
                 </TouchableOpacity>
 
-                {attempts > 0 && (
-                    <Text style={styles.attemptsText}>
-                        {3 - attempts} attempts remaining
-                    </Text>
-                )}
+
             </View>
 
             {/* Privacy Note */}

@@ -8,10 +8,10 @@ spring:
   # Database Configuration (Aiven Cloud MySQL)
   datasource:
     # URL format: jdbc:mysql://<Host>:<Port>/<Database>?sslMode=<SSL_Mode>
-    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://mysql-3b5649af-saurabhyadav16091-68f0.l.aivencloud.com:16609/defaultdb?sslMode=REQUIRED}
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://gateway01.ap-southeast-1.prod.aws.tidbcloud.com:4000/test?sslMode=VERIFY_IDENTITY&useSSL=true}
     driver-class-name: com.mysql.cj.jdbc.Driver
-    username: ${SPRING_DATASOURCE_USERNAME:avnadmin}
-    password: ${SPRING_DATASOURCE_PASSWORD:YOUR_AIVEN_PASSWORD}
+    username: ${SPRING_DATASOURCE_USERNAME:2fYhmtFcGaxNktV.root}
+    password: ${SPRING_DATASOURCE_PASSWORD:1eLnBPCVsskKYVyb}
 
   # JPA Configuration
   jpa:

@@ -20,7 +20,7 @@ export interface DetectedSubscription {
  * Analyze transactions to detect subscription patterns
  * Runs as a 24-hour background task
  */
-export async function detectSubscriptions(): Promise<DetectedSubscription[]> {
+export async function detectSubscriptions(userId: number): Promise<DetectedSubscription[]> {
     const db = getDatabase();
     const subscriptions: DetectedSubscription[] = [];
 
@@ -30,18 +30,22 @@ export async function detectSubscriptions(): Promise<DetectedSubscription[]> {
     const startDate = sixMonthsAgo.toISOString().split('T')[0];
 
     const [result] = await db.executeSql(`
-    SELECT merchant, 
-           GROUP_CONCAT(id) as transaction_ids,
-           GROUP_CONCAT(amount) as amounts,
-           GROUP_CONCAT(date) as dates,
-           COUNT(*) as count
+    const [result] = await db.executeSql(`
+    SELECT COALESCE(original_merchant, merchant) as merchant_key,
+        merchant,
+        GROUP_CONCAT(id) as transaction_ids,
+        GROUP_CONCAT(amount) as amounts,
+        GROUP_CONCAT(date) as dates,
+        COUNT(*) as count
     FROM transactions 
     WHERE type = 'debit' 
-      AND date >= ?
-    GROUP BY UPPER(merchant)
+      AND user_id = ?
+        AND date >= ?
+        GROUP BY COALESCE(original_merchant, merchant)
     HAVING COUNT(*) >= 2
     ORDER BY COUNT(*) DESC
-  `, [startDate]);
+        `, [userId, startDate]);
+  `, [userId, startDate]);
 
     for (let i = 0; i < result.rows.length; i++) {
         const row = result.rows.item(i);
@@ -53,7 +57,7 @@ export async function detectSubscriptions(): Promise<DetectedSubscription[]> {
         const pattern = detectPatternHeuristic(amounts, dates);
         if (pattern) {
             subscriptions.push({
-                merchant: row.merchant,
+                merchant: row.merchant_key, // Use the stable key (original_merchant) if available
                 amount: pattern.amount,
                 frequency: pattern.frequency,
                 confidence: pattern.confidence,
@@ -144,29 +148,31 @@ function calculateNextDate(lastDate: string, frequency: 'weekly' | 'monthly' | '
 /**
  * Save detected subscriptions to database
  */
-export async function saveSubscriptions(subscriptions: DetectedSubscription[]): Promise<void> {
+export async function saveSubscriptions(subscriptions: DetectedSubscription[], userId: number): Promise<void> {
     const db = getDatabase();
 
-    // Clear existing subscriptions
-    await db.executeSql('DELETE FROM subscriptions');
+    // Use Upsert logic to prevent duplicates and preserve is_active state if possible
+    // Note: SQLite 'INSERT OR REPLACE' replaces the whole row, resetting is_active to default (1)
+    // We want to avoid duplicates.
 
-    // Insert new ones
     for (const sub of subscriptions) {
+        // We use INSERT OR REPLACE as a simple 'merge' for now, verifying unique constraint handles it.
+        // With UNIQUE(merchant, user_id), this will update if exists.
         await db.executeSql(`
-      INSERT INTO subscriptions (merchant, amount, frequency, next_date, is_active)
-      VALUES (?, ?, ?, ?, 1)
-    `, [sub.merchant, sub.amount, sub.frequency, sub.nextExpectedDate]);
+      INSERT OR REPLACE INTO subscriptions (merchant, amount, frequency, next_date, is_active, user_id, original_merchant)
+      VALUES (?, ?, ?, ?, 1, ?, ?)
+    `, [sub.merchant, sub.amount, sub.frequency, sub.nextExpectedDate, userId, sub.merchant]);
     }
 }
 
 /**
  * Get all active subscriptions
  */
-export async function getActiveSubscriptions(): Promise<DetectedSubscription[]> {
+export async function getActiveSubscriptions(userId: number): Promise<DetectedSubscription[]> {
     const db = getDatabase();
     const [result] = await db.executeSql(`
-    SELECT * FROM subscriptions WHERE is_active = 1 ORDER BY next_date
-  `);
+    SELECT * FROM subscriptions WHERE is_active = 1 AND user_id = ? ORDER BY next_date
+  `, [userId]);
 
     const subscriptions: DetectedSubscription[] = [];
     for (let i = 0; i < result.rows.length; i++) {
@@ -186,8 +192,8 @@ export async function getActiveSubscriptions(): Promise<DetectedSubscription[]> 
 /**
  * Calculate total monthly subscription cost
  */
-export async function getMonthlySubscriptionCost(): Promise<number> {
-    const subscriptions = await getActiveSubscriptions();
+export async function getMonthlySubscriptionCost(userId: number): Promise<number> {
+    const subscriptions = await getActiveSubscriptions(userId);
 
     return subscriptions.reduce((total, sub) => {
         switch (sub.frequency) {

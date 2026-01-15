@@ -1,4 +1,4 @@
-// Database service for SQLite operations
+
 // Uses react-native-sqlite-storage
 
 import SQLite, { SQLiteDatabase } from 'react-native-sqlite-storage';
@@ -41,6 +41,48 @@ export async function initDatabase(): Promise<void> {
         } catch (e) {
             console.log('Migrating: Adding account_id to transactions table');
             await db.executeSql('ALTER TABLE transactions ADD COLUMN account_id INTEGER REFERENCES accounts(id)');
+        }
+
+        // Migration v5: Add original_merchant column and backfill data
+        try {
+            const [versionResult] = await db.executeSql('PRAGMA user_version');
+            const userVersion = versionResult.rows.item(0).user_version;
+
+            if (userVersion < 5) {
+                console.log('Migration v5: Adding original_merchant column...');
+                await db.executeSql('ALTER TABLE transactions ADD COLUMN original_merchant TEXT');
+                await db.executeSql('ALTER TABLE subscriptions ADD COLUMN original_merchant TEXT');
+
+                // HEAL DATA: Backfill original_merchant
+                console.log('Healing data: Backfilling original_merchant...');
+
+                // 1. First, set default to current merchant name for all
+                await db.executeSql('UPDATE transactions SET original_merchant = merchant WHERE original_merchant IS NULL');
+                await db.executeSql('UPDATE subscriptions SET original_merchant = merchant WHERE original_merchant IS NULL');
+
+                // 2. Now use merchant_mapping to restore TRUE original names (sms_name) where possible
+                // We iterate through mappings to find transactions that match either the raw name or current display name
+                const [mappings] = await db.executeSql('SELECT sms_name, display_name, user_id FROM merchant_mapping');
+
+                for (let i = 0; i < mappings.rows.length; i++) {
+                    const m = mappings.rows.item(i);
+                    // If transaction matches current display name, set original to sms_name
+                    await db.executeSql(
+                        'UPDATE transactions SET original_merchant = ? WHERE (merchant = ? OR merchant = ?) AND user_id = ?',
+                        [m.sms_name, m.display_name, m.sms_name, m.user_id]
+                    );
+                    await db.executeSql(
+                        'UPDATE subscriptions SET original_merchant = ? WHERE (merchant = ? OR merchant = ?) AND user_id = ?',
+                        [m.sms_name, m.display_name, m.sms_name, m.user_id]
+                    );
+                }
+                console.log('Data healing complete.');
+                await db.executeSql('PRAGMA user_version = 5');
+            }
+        } catch (e: any) {
+            if (!e.message?.includes('duplicate column')) {
+                console.error('Migration v5 failed', e);
+            }
         }
 
         // Migration: Add user_id to all tables if not exists
@@ -126,6 +168,28 @@ export async function initDatabase(): Promise<void> {
                 `);
 
                 await tx.executeSql('DROP TABLE accounts_old');
+            });
+        }
+
+        // Fix subscriptions UNIQUE constraint
+        const [subSchemaResult] = await db.executeSql("SELECT sql FROM sqlite_master WHERE type='table' AND name='subscriptions'");
+        const subTableSql = subSchemaResult.rows.item(0)?.sql || '';
+
+        if (!subTableSql.includes('UNIQUE(merchant, user_id)')) {
+            console.log('Migrating: Recreating subscriptions table for UNIQUE constraint');
+            await db.transaction(async (tx) => {
+                await tx.executeSql('ALTER TABLE subscriptions RENAME TO subscriptions_old');
+
+                // Recreate (definition from schema.ts - index 3)
+                await tx.executeSql(CREATE_TABLES_SQL[3]);
+
+                // Use INSERT OR IGNORE to handle duplicates during migration
+                await tx.executeSql(`
+                    INSERT OR IGNORE INTO subscriptions (id, merchant, amount, frequency, next_date, is_active, user_id, created_at)
+                    SELECT id, merchant, amount, frequency, next_date, is_active, user_id, created_at FROM subscriptions_old
+                `);
+
+                await tx.executeSql('DROP TABLE subscriptions_old');
             });
         }
 
@@ -228,8 +292,8 @@ export async function insertTransaction(transaction: Omit<Transaction, 'id' | 'c
 
 
     const [result] = await database.executeSql(
-        `INSERT INTO transactions (amount, type, merchant, category_id, account_id, user_id, date, raw_sms, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO transactions (amount, type, merchant, category_id, account_id, user_id, date, raw_sms, notes, original_merchant)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
             transaction.amount,
             transaction.type,
@@ -240,6 +304,7 @@ export async function insertTransaction(transaction: Omit<Transaction, 'id' | 'c
             transaction.date,
             transaction.rawSms,
             transaction.notes,
+            transaction.originalMerchant,
         ]
     );
     return result.insertId;
@@ -487,7 +552,7 @@ export async function getMonthlySpending(userId: number, year: number, month: nu
      WHERE user_id = ? AND type = 'debit' AND date BETWEEN ? AND ?`,
         [userId, startDate, endDate]
     );
-    return result.rows.item(0)?.total || 0;
+    return Number(result.rows.item(0)?.total || 0);
 }
 
 export async function getCategorySpending(userId: number, year: number, month: number): Promise<{ categoryId: number; total: number }[]> {
@@ -578,6 +643,7 @@ function mapRowToTransaction(row: any): Transaction {
         date: row.date,
         rawSms: row.raw_sms,
         notes: row.notes,
+        originalMerchant: row.original_merchant,
         createdAt: row.created_at,
     };
 }
