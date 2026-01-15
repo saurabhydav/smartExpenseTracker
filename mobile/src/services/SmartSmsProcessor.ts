@@ -195,11 +195,22 @@ export async function updateAllTransactionsForMerchant(
     const db = getDatabase();
     // Fix: Update based on original_merchant (stable ID) OR merchant (display name)
     // This handles both new schema (original_merchant) and old schema (merchant)
+
+    // 1. Update Transactions
     await db.executeSql(
         `UPDATE transactions 
          SET merchant = ?, category_id = ? 
          WHERE UPPER(original_merchant) = UPPER(?) OR UPPER(merchant) = UPPER(?)`,
         [displayName, categoryId, rawName, rawName]
+    );
+
+    // 2. Update Subscriptions (Sync name change)
+    // Use UPDATE OR REPLACE to handle cases where the target name already exists
+    await db.executeSql(
+        `UPDATE OR REPLACE subscriptions
+         SET merchant = ?
+         WHERE UPPER(original_merchant) = UPPER(?) OR UPPER(merchant) = UPPER(?)`,
+        [displayName, rawName, rawName]
     );
 }
 
@@ -288,7 +299,7 @@ export async function processSmartSms(
     const validation = await validateTransactionSms(sms, sender);
 
     if (!validation.isValid) {
-        console.log('SMS validation failed:', validation.reason);
+        // console.log('SMS validation failed:', validation.reason); // Reduce log noise
         return {
             success: false,
             error: `Not a valid transaction: ${validation.reason} `

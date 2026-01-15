@@ -4,16 +4,20 @@ import axios, { AxiosError, type AxiosInstance, type InternalAxiosRequestConfig 
 import * as Keychain from 'react-native-keychain';
 
 // API base URL - configure for your environment
-const API_BASE_URL = __DEV__
-    ? 'http://10.80.173.232:8080' // Physical device local IP
-    : 'https://smartexpensetracker-bjlu.onrender.com';
+// API base URL - configure for your environment
+// const API_BASE_URL = __DEV__
+//    ? 'http://10.0.2.2:8080' // Android Emulator loopback
+//    : 'https://smartexpensetracker-bjlu.onrender.com';
+
+// FORCE USE RENDER BACKEND (As per user troubleshooting)
+const API_BASE_URL = 'https://smartexpensetracker-bjlu.onrender.com';
 
 const TOKEN_SERVICE = 'ExpenseTrackerAuth';
 
 // Create axios instance
 const api: AxiosInstance = axios.create({
     baseURL: API_BASE_URL,
-    timeout: 30000,
+    timeout: 60000, // Increased to 60s for Render free tier cold starts
     headers: {
         'Content-Type': 'application/json',
     },

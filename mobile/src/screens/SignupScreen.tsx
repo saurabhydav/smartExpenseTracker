@@ -61,7 +61,8 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
             setUser(response.user);
             setAuthenticated(true);
         } catch (error: any) {
-            Alert.alert('Signup Failed', error.response?.data?.message || 'Could not create account');
+            const errorMessage = error.response?.data?.message || error.message || 'Could not create account';
+            Alert.alert('Signup Failed', errorMessage);
         } finally {
             setIsLoading(false);
         }

@@ -30,7 +30,6 @@ export async function detectSubscriptions(userId: number): Promise<DetectedSubsc
     const startDate = sixMonthsAgo.toISOString().split('T')[0];
 
     const [result] = await db.executeSql(`
-    const [result] = await db.executeSql(`
     SELECT COALESCE(original_merchant, merchant) as merchant_key,
         merchant,
         GROUP_CONCAT(id) as transaction_ids,
@@ -40,11 +39,10 @@ export async function detectSubscriptions(userId: number): Promise<DetectedSubsc
     FROM transactions 
     WHERE type = 'debit' 
       AND user_id = ?
-        AND date >= ?
-        GROUP BY COALESCE(original_merchant, merchant)
+      AND date >= ?
+    GROUP BY COALESCE(original_merchant, merchant)
     HAVING COUNT(*) >= 2
     ORDER BY COUNT(*) DESC
-        `, [userId, startDate]);
   `, [userId, startDate]);
 
     for (let i = 0; i < result.rows.length; i++) {

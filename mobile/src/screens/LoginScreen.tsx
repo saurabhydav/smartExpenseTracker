@@ -80,7 +80,8 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
                 setAuthenticated(true);
             }
         } catch (error: any) {
-            Alert.alert('Login Failed', error.response?.data?.message || 'Invalid email or password');
+            const errorMessage = error.response?.data?.message || error.message || 'Invalid email or password';
+            Alert.alert('Login Failed', errorMessage);
         } finally {
             setIsLoading(false);
         }

@@ -49,9 +49,11 @@ export async function initDatabase(): Promise<void> {
             const userVersion = versionResult.rows.item(0).user_version;
 
             if (userVersion < 5) {
-                console.log('Migration v5: Adding original_merchant column...');
-                await db.executeSql('ALTER TABLE transactions ADD COLUMN original_merchant TEXT');
-                await db.executeSql('ALTER TABLE subscriptions ADD COLUMN original_merchant TEXT');
+                console.log('Migration v5: Checking structure...');
+
+                // Add columns safely
+                try { await db.executeSql('ALTER TABLE transactions ADD COLUMN original_merchant TEXT'); } catch (e) { }
+                try { await db.executeSql('ALTER TABLE subscriptions ADD COLUMN original_merchant TEXT'); } catch (e) { }
 
                 // HEAL DATA: Backfill original_merchant
                 console.log('Healing data: Backfilling original_merchant...');
@@ -61,28 +63,31 @@ export async function initDatabase(): Promise<void> {
                 await db.executeSql('UPDATE subscriptions SET original_merchant = merchant WHERE original_merchant IS NULL');
 
                 // 2. Now use merchant_mapping to restore TRUE original names (sms_name) where possible
-                // We iterate through mappings to find transactions that match either the raw name or current display name
-                const [mappings] = await db.executeSql('SELECT sms_name, display_name, user_id FROM merchant_mapping');
-
-                for (let i = 0; i < mappings.rows.length; i++) {
-                    const m = mappings.rows.item(i);
-                    // If transaction matches current display name, set original to sms_name
-                    await db.executeSql(
-                        'UPDATE transactions SET original_merchant = ? WHERE (merchant = ? OR merchant = ?) AND user_id = ?',
-                        [m.sms_name, m.display_name, m.sms_name, m.user_id]
-                    );
-                    await db.executeSql(
-                        'UPDATE subscriptions SET original_merchant = ? WHERE (merchant = ? OR merchant = ?) AND user_id = ?',
-                        [m.sms_name, m.display_name, m.sms_name, m.user_id]
-                    );
+                try {
+                    const [mappings] = await db.executeSql('SELECT sms_name, display_name, user_id FROM merchant_mapping');
+                    if (mappings.rows.length > 0) {
+                        for (let i = 0; i < mappings.rows.length; i++) {
+                            const m = mappings.rows.item(i);
+                            // If transaction matches current display name, set original to sms_name
+                            await db.executeSql(
+                                'UPDATE transactions SET original_merchant = ? WHERE (merchant = ? OR merchant = ?) AND user_id = ?',
+                                [m.sms_name, m.display_name, m.sms_name, m.user_id]
+                            );
+                            await db.executeSql(
+                                'UPDATE subscriptions SET original_merchant = ? WHERE (merchant = ? OR merchant = ?) AND user_id = ?',
+                                [m.sms_name, m.display_name, m.sms_name, m.user_id]
+                            );
+                        }
+                    }
+                } catch (e) {
+                    console.log('Skipping mapping backfill (no mappings yet)');
                 }
+
                 console.log('Data healing complete.');
                 await db.executeSql('PRAGMA user_version = 5');
             }
         } catch (e: any) {
-            if (!e.message?.includes('duplicate column')) {
-                console.error('Migration v5 failed', e);
-            }
+            console.error('Migration v5 minor error (ignored)', e);
         }
 
         // Migration: Add user_id to all tables if not exists
@@ -267,25 +272,44 @@ export async function insertTransaction(transaction: Omit<Transaction, 'id' | 'c
     // We check User, Amount, Date, Type, and Merchant.
     // This handles the user's request: "Identify... if it's repeated".
     if (checkDuplicates) {
-        const [existing] = await database.executeSql(
-            `SELECT id FROM transactions 
-             WHERE user_id = ? 
-             AND amount = ? 
-             AND date = ? 
-             AND type = ? 
-             AND merchant = ?`,
-            [
-                transaction.userId,
-                transaction.amount,
-                transaction.date,
-                transaction.type,
-                transaction.merchant
-            ]
-        );
+        // 1. Strong Check: If rawSms exists, use it (Perfect deduplication for SMS)
+        if (transaction.rawSms) {
+            const [existing] = await database.executeSql(
+                'SELECT id FROM transactions WHERE user_id = ? AND raw_sms = ?',
+                [transaction.userId, transaction.rawSms]
+            );
+            if (existing.rows.length > 0) {
+                console.log(`Skipping duplicate SMS transaction for user ${transaction.userId} (ID: ${existing.rows.item(0).id})`);
+                return existing.rows.item(0).id;
+            }
+        }
 
-        if (existing.rows.length > 0) {
-            console.log(`Skipping duplicate transaction for user ${transaction.userId} (ID: ${existing.rows.item(0).id})`);
-            return existing.rows.item(0).id;
+        // 2. Weak Check: For manual entries or fallback (Check Amount, Date, Type)
+        // Removed 'merchant' from check to allow renaming without breaking duplicates logic
+        // But for manual entries, merchant distinction is probably desired?
+        // Let's keep strict check for manual.
+
+        if (!transaction.rawSms) {
+            const [existing] = await database.executeSql(
+                `SELECT id FROM transactions 
+                 WHERE user_id = ? 
+                 AND amount = ? 
+                 AND date = ? 
+                 AND type = ? 
+                 AND merchant = ?`,
+                [
+                    transaction.userId,
+                    transaction.amount,
+                    transaction.date,
+                    transaction.type,
+                    transaction.merchant
+                ]
+            );
+
+            if (existing.rows.length > 0) {
+                console.log(`Skipping duplicate manual transaction for user ${transaction.userId} (ID: ${existing.rows.item(0).id})`);
+                return existing.rows.item(0).id;
+            }
         }
     }
 

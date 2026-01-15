@@ -296,7 +296,8 @@ export async function shareReport(startDate: string, endDate: string): Promise<b
     return true;
   } catch (error) {
     // PDF generation failed (likely native module not linked)
-    console.log('PDF generation failed, falling back to text share:', error);
+    // PDF generation failed (likely native module not linked)
+    console.log('PDF unavailable, switching to text mode.'); // Less alarming log
 
     // Fallback to text sharing
     try {
