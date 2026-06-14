@@ -78,10 +78,14 @@ export async function signInToGoogleDrive(): Promise<{ success: boolean; error?:
             offlineAccess: true,
         });
 
-        let response: any = await GoogleSignin.signInSilently();
-        if (response.type !== 'success') {
-            response = await GoogleSignin.signIn();
+        // Clear previous session to force the Google Account picker dialog to display
+        try {
+            await GoogleSignin.signOut();
+        } catch (e) {
+            // Ignore error if not already signed in
         }
+
+        const response: any = await GoogleSignin.signIn();
 
         if (response.type !== 'success') {
             throw new Error('Google Sign-In failed or cancelled');
