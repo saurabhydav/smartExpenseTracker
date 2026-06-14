@@ -10,7 +10,7 @@ import * as Keychain from 'react-native-keychain';
 //    : 'https://smartexpensetracker-bjlu.onrender.com';
 
 // FORCE USE RENDER BACKEND (As per user troubleshooting)
-const API_BASE_URL = 'https://smartexpensetracker-bjlu.onrender.com';
+const API_BASE_URL = 'https://smartexpensetracker-backend-2pl7.onrender.com';
 
 const TOKEN_SERVICE = 'ExpenseTrackerAuth';
 
