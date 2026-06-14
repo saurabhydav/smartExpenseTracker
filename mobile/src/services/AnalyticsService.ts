@@ -255,27 +255,41 @@ export async function generateInsights(userId: number, totalBudget?: number): Pr
  */
 export async function getChartData(userId: number, days: number = 30): Promise<{ date: string; amount: number }[]> {
     const db = getDatabase();
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-
-    const [result] = await db.executeSql(`
-    SELECT date, COALESCE(SUM(amount), 0) as total
-    FROM transactions
-    WHERE user_id = ?
-      AND type = 'debit'
-      AND date >= ?
-      AND date <= ?
-    GROUP BY date
-    ORDER BY date
-  `, [userId, startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]]);
-
     const data: { date: string; amount: number }[] = [];
-    for (let i = 0; i < result.rows.length; i++) {
-        const row = result.rows.item(i);
+
+    // Group spending into 4 weeks (last 28 days)
+    for (let i = 3; i >= 0; i--) {
+        const start = new Date();
+        start.setDate(start.getDate() - (i + 1) * 7 + 1);
+        const end = new Date();
+        end.setDate(end.getDate() - i * 7);
+
+        const startStr = start.toISOString().split('T')[0];
+        const endStr = end.toISOString().split('T')[0];
+
+        const [result] = await db.executeSql(`
+            SELECT COALESCE(SUM(amount), 0) as total
+            FROM transactions
+            WHERE user_id = ?
+              AND type = 'debit'
+              AND date >= ?
+              AND date <= ?
+        `, [userId, startStr, endStr]);
+
+        const total = result.rows.length > 0 ? result.rows.item(0).total : 0;
+
+        let label = '';
+        if (i === 0) {
+            label = 'This Wk';
+        } else if (i === 1) {
+            label = '1 Wk Ago';
+        } else {
+            label = `${i} Wks Ago`;
+        }
+
         data.push({
-            date: row.date,
-            amount: row.total,
+            date: label, // Store weekly label in the date field to preserve types
+            amount: total,
         });
     }
     return data;

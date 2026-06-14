@@ -11,7 +11,7 @@ import {
     ActivityIndicator,
     Dimensions,
 } from 'react-native';
-import { LineChart } from 'react-native-chart-kit';
+import { BarChart } from 'react-native-chart-kit';
 import { useAppStore } from '../store';
 import {
     calculateBurnRate,
@@ -125,7 +125,7 @@ export default function InsightsScreen() {
 
     // Prepare chart data
     const chartLabels = chartData.length > 0
-        ? chartData.filter((_, i) => i % 5 === 0).map(d => d.date.slice(8))
+        ? chartData.map(d => d.date)
         : [''];
     const chartValues = chartData.length > 0
         ? chartData.map(d => d.amount)
@@ -198,14 +198,16 @@ export default function InsightsScreen() {
             {/* Spending Chart */}
             {chartData.length > 0 && (
                 <View style={styles.chartCard}>
-                    <Text style={styles.cardTitle}>Last 30 Days</Text>
-                    <LineChart
+                    <Text style={styles.cardTitle}>Weekly Spending (Last 4 Weeks)</Text>
+                    <BarChart
                         data={{
                             labels: chartLabels,
                             datasets: [{ data: chartValues.length > 0 ? chartValues : [0] }],
                         }}
                         width={width - 48}
-                        height={180}
+                        height={220}
+                        yAxisLabel=""
+                        yAxisSuffix=""
                         chartConfig={{
                             backgroundColor: colors.surface,
                             backgroundGradientFrom: colors.surface,
@@ -214,9 +216,7 @@ export default function InsightsScreen() {
                             color: (opacity = 1) => `rgba(99, 102, 241, ${opacity})`,
                             labelColor: () => colors.textSecondary,
                             style: { borderRadius: 16 },
-                            propsForDots: { r: '3', strokeWidth: '1', stroke: colors.primary },
                         }}
-                        bezier
                         style={styles.chart}
                     />
                 </View>

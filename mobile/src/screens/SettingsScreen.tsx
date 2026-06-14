@@ -264,31 +264,6 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
                 </View>
             </View>
 
-            {/* Preferences Section */}
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Preferences</Text>
-                <View style={styles.card}>
-                    <SettingItem
-                        icon="paid"
-                        title="Currency"
-                        subtitle={`Current: ${useAppStore(s => s.currencySymbol)}`}
-                        onPress={() => {
-                            Alert.alert(
-                                'Select Currency',
-                                'Choose your preferred currency symbol',
-                                [
-                                    { text: '₹ (INR)', onPress: () => useAppStore.getState().setCurrencySymbol('₹') },
-                                    { text: '$ (USD)', onPress: () => useAppStore.getState().setCurrencySymbol('$') },
-                                    { text: '€ (EUR)', onPress: () => useAppStore.getState().setCurrencySymbol('€') },
-                                    { text: '£ (GBP)', onPress: () => useAppStore.getState().setCurrencySymbol('£') },
-                                    { text: '¥ (JPY)', onPress: () => useAppStore.getState().setCurrencySymbol('¥') },
-                                    { text: 'Cancel', style: 'cancel' }
-                                ]
-                            );
-                        }}
-                    />
-                </View>
-            </View>
 
             {/* Security Section */}
             <View style={styles.section}>
