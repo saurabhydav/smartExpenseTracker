@@ -17,17 +17,10 @@ public class SmsReceiver extends BroadcastReceiver {
     private static final String TAG = "SmsReceiver";
     private static final String SMS_RECEIVED_ACTION = "android.provider.Telephony.SMS_RECEIVED";
 
-    // Bank SMS sender IDs - add more as needed
-    private static final String[] BANK_SENDER_PREFIXES = {
-            "AD-HDFC", "AX-HDFC", "VK-HDFC", // HDFC Bank
-            "AD-ICICI", "VK-ICICI", // ICICI Bank
-            "AD-SBIINB", "VK-SBIINB", // SBI
-            "AD-AXIS", "VK-AXIS", // Axis Bank
-            "AD-KOTAK", "VK-KOTAK", // Kotak
-            "AD-PAYTM", "VK-PAYTM", // Paytm
-            "AD-GPAY", "VK-GPAY", // Google Pay
-            "AD-PHONEPE", "VK-PHONEPE", // PhonePe
-            "JD-AMZN", "AD-AMAZON", // Amazon Pay
+    // Bank SMS sender keywords - matches typical DLT headers (e.g., JX-HDFCBK) robustly
+    private static final String[] BANK_SENDER_KEYWORDS = {
+            "HDFC", "ICICI", "SBI", "AXIS", "KOTAK", "PAYTM", "GPAY", "PHONEPE", "AMZN", "AMAZON",
+            "PNB", "IDFC", "YESBNK", "CANARA", "UNIONB", "RBL", "INDZB", "CBSSMS", "BOBSMS", "BOBTXN"
     };
 
     // Keywords that indicate a transaction SMS
@@ -77,27 +70,32 @@ public class SmsReceiver extends BroadcastReceiver {
      * Check if SMS is from a bank based on sender ID and content
      */
     private boolean isBankSms(String sender, String body) {
-        // Check sender ID
-        if (sender != null) {
-            String upperSender = sender.toUpperCase();
-            for (String prefix : BANK_SENDER_PREFIXES) {
-                if (upperSender.contains(prefix)) {
-                    return true;
-                }
+        if (sender == null || body == null) {
+            return false;
+        }
+
+        String upperSender = sender.toUpperCase();
+        String upperBody = body.toUpperCase();
+
+        // 1. Check if sender matches any bank keyword
+        boolean isFromBank = false;
+        for (String keyword : BANK_SENDER_KEYWORDS) {
+            if (upperSender.contains(keyword)) {
+                isFromBank = true;
+                break;
             }
         }
 
-        // Check message content for transaction keywords
-        if (body != null) {
-            String upperBody = body.toUpperCase();
-            for (String keyword : TRANSACTION_KEYWORDS) {
-                if (upperBody.contains(keyword.toUpperCase())) {
-                    return true;
-                }
+        // 2. Check body content for transaction indicators
+        boolean isTransaction = false;
+        for (String keyword : TRANSACTION_KEYWORDS) {
+            if (upperBody.contains(keyword.toUpperCase())) {
+                isTransaction = true;
+                break;
             }
         }
 
-        return false;
+        return isFromBank && isTransaction;
     }
 
     /**
@@ -109,7 +107,11 @@ public class SmsReceiver extends BroadcastReceiver {
         serviceIntent.putExtra("body", body);
         serviceIntent.putExtra("timestamp", System.currentTimeMillis());
 
-        context.startService(serviceIntent);
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            context.startForegroundService(serviceIntent);
+        } else {
+            context.startService(serviceIntent);
+        }
         HeadlessJsTaskService.acquireWakeLockNow(context);
     }
 }

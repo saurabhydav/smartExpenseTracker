@@ -1,0 +1,48 @@
+# [src/services/AuthService.ts](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/AuthService.ts) - Technical Explanation
+
+This file acts as a dedicated wrapper around the backend authentication API. It separates the business logic of "Logging In" from the raw network requests.
+
+## 1. Type Definitions (Lines 5-28)
+```typescript
+export interface UserInfo { id: number; name: string; email: string; }
+export interface AuthResponse { accessToken: string; refreshToken: string; ... user: UserInfo; }
+export interface SignupRequest { ... }
+export interface LoginRequest { ... }
+```
+*   **Logical Flow**: Strict TypeScript definitions for exactly what the app sends to the server when logging in/signing up, and exactly what the server sends back (Tokens + User data).
+
+## 2. AuthService Class (Lines 30-61)
+```typescript
+class AuthService {
+    async isAuthenticated(): Promise<boolean> {
+        const tokens = await getTokens();
+        return !!tokens?.accessToken;
+    }
+```
+*   **Syntax**: `!!` (double exclamation) is a JavaScript trick to force any value into a strict boolean (`true` or `false`). If `accessToken` is undefined or null, `!!` turns it into `false`.
+*   **Logical Flow**: Used by the app router on launch to decide whether to show the Login Screen or jump straight to the Dashboard.
+
+### Login / Signup Flow
+```typescript
+    async login(request: LoginRequest): Promise<AuthResponse> {
+        const response = await api.post<AuthResponse>('/api/auth/login', request);
+        await saveTokens(response.data.accessToken, response.data.refreshToken);
+        return response.data;
+    }
+```
+*   **Syntax**: `api.post` uses a custom Axios instance (not standard `fetch`) which handles background headers automatically.
+*   **Logical Flow**: 
+    1. Sends the email/password to the Cloudflare server.
+    2. Waits for the server to reply with a JWT (JSON Web Token).
+    3. Saves that token securely to device storage using [saveTokens](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/api.ts#26-34).
+    4. Passes the raw user data back to the UI so Zustand can update the profile name.
+
+### Logout Flow
+```typescript
+    async logout(): Promise<void> {
+        try { await api.post('/api/auth/logout'); } 
+        catch (error) { console.log('Logout API error (ignored):', error); }
+        await clearTokens();
+    }
+```
+*   **Logical Flow**: **Failsafe Design**. It tells the server "I'm logging out, destroy my token session". If the phone is out of cell service and the server throws a network error, the `catch` block intentionally ignores it. It then forces local device tokens to be deleted ([clearTokens()](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/api.ts#47-50)) so the user is securely logged out locally regardless of internet connection.

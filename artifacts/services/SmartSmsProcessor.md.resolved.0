@@ -1,0 +1,86 @@
+# [src/services/SmartSmsProcessor.ts](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/SmartSmsProcessor.ts) - Technical Explanation
+
+This is the central "Brain" service. It connects the background SMS listener to the Regex Engine, evaluates spam, tracks merchant renaming records, and commits final parsed outputs to the SQLite database.
+
+## 1. Spam Filtering & Validation (Lines 39-138)
+```typescript
+const BANK_INDICATORS = [ /debited|credited|spent/, /A\/c|account/, /UPI|IMPS/ ];
+const BANK_SENDER_IDS = [ /HDFCBK/, /SBIN/, /ICICIB/ ];
+const SPAM_INDICATORS = [ /click here/, /win|won/, /\d{4,8}\s+is\s+your\s+OTP/ ];
+
+export async function validateTransactionSms(sms: string, sender: string): Promise<SmsValidationResult> {
+    let confidence = 0;
+    if (/-[P]($|[A-Z])/i.test(sender)) return { isValid: false }; // Block Promotional
+    if (spamMatches > 0) return { isValid: false };
+
+    // Point system evaluating sender legitimacy + keyword density
+    if (bankMatches >= 2) confidence += 0.7;
+    
+    return { isValid: confidence >= 0.6, ... };
+}
+```
+*   **Logical Flow**: 
+    1. Instantly blocks any sender ending in `-P` (telecom standard for Promotional messages).
+    2. Instantly blocks messages containing URLs or OTP codes.
+    3. Uses a calculated 'Confidence Score'. HDFC Bank + "debited" = 1.0 (Pass). Unknown Sender + "debited" = 0.3 (Fail). Unknown Sender + "debited" + "A/c" + "Rs. 50" = 0.8 (Pass).
+
+## 2. Managing Merchant Naming Rules (Lines 158-222)
+```typescript
+export async function saveMerchantName(...) {
+    // 1. Save rule to database
+    await insertMerchantMapping({ smsName: rawName.toUpperCase(), displayName, ... });
+
+    // 2. Loop back and fix past errors
+    await updateAllTransactionsForMerchant(rawName, displayName, categoryId);
+    
+    // 3. Command UI to rebuild
+    DeviceEventEmitter.emit('TRANSACTION_UPDATED');
+}
+```
+*   **Logical Flow**: When a user renames `TXN*BBSK` to "BigBasket", this function executes that rule. Crucially, it triggers the [updateAllTransactionsForMerchant](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/SmartSmsProcessor.ts#194-223) SQL query to retroactively scan the database and rename any older, historically ugly transactions to match the new naming scheme instantly.
+
+## 3. Account Auto-Creation Module (Lines 409-483)
+```typescript
+async function resolveAccountId(last4: string | undefined, sender: string, userId: number) {
+    // ... Check if account exists
+    const [existing] = await db.executeSql(
+         'SELECT id FROM accounts WHERE bank_name = ? AND last_4 = ?', [bankName, last4]
+    );
+
+    // ... Create if missing
+    const defaultName = `${bankName} debit - ${last4}`;
+    const [result] = await db.executeSql(
+         'INSERT INTO accounts (name, bank_name, last_4...) VALUES (...)', ...
+    );
+}
+```
+*   **Logical Flow**: If an SMS arrives from "HDFC" for an account ending in "1122", it checks if the app tracks that account. If it doesn't, it silently creates a new digital wallet in the database named "HDFC debit - 1122" on the fly so the transaction has a valid `account_id` relationship to link to.
+
+## 4. The Master Process Flow ([processSmartSms](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/SmartSmsProcessor.ts#260-407)) (Lines 260-406)
+```typescript
+export async function processSmartSms(sms: string, sender: string, ...) {
+    // 1. Safety Gate
+    if (!currentUserId) return { success: false };
+    
+    // 2. Anti-Spam Gate
+    const validation = await validateTransactionSms(sms, sender);
+    if (!validation.isValid) return { success: false };
+
+    // 3. Text Extraction
+    const parsed = await parseExpense(sms, ...);
+
+    // 4. Memory Check (Have we seen this merchant before?)
+    const mapping = await getMerchantMapping(parsed.merchant, currentUserId);
+    
+    let displayName = mapping ? mapping.displayName : parsed.merchant;
+
+    // 5. Hard Save
+    const transactionId = await insertTransaction({ amount: parsed.amount, merchant: displayName, ... });
+
+    // 6. UI Prompt Gate
+    if (!mapping) {
+        if (onNewMerchantCallback) onNewMerchantCallback({...});
+    }
+}
+```
+*   **Logical Flow**: The central orchestrator. It receives raw background pushes, feeds them through validation algorithms, extracts the data, applies customized user rules, saves it to SQLite, and formally opens the popup asking the user to rename it if it's completely foreign.

@@ -1,0 +1,66 @@
+# [src/services/api.ts](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/api.ts) - Technical Explanation
+
+This file configures `Axios` (a Javascript HTTP client library). It handles the complexities of securely attaching authorization headers to every single network request automatically, and invisibly rescuing requests if the security token expires mid-flight.
+
+## 1. Instance Setup and Storage (Lines 3-49)
+```typescript
+import axios from 'axios';
+import * as Keychain from 'react-native-keychain';
+
+const API_BASE_URL = 'https://smartexpensetracker-bjlu.onrender.com';
+
+const api = axios.create({ baseURL: API_BASE_URL, timeout: 60000 });
+
+export async function saveTokens(accessToken: string, refreshToken: string) {
+    await Keychain.setGenericPassword('tokens', JSON.stringify({ accessToken, refreshToken }), ...);
+}
+```
+*   **Syntax**: `axios.create()` instantiates a master template for all future web requests, setting default rules (always aim at the Render server URL, and wait up to 60 seconds before deciding the server is dead).
+*   **Logical Flow**: `react-native-keychain` is a critical security library. It binds the locally saved JWT tokens directly to the OS-level Hardware Keystore (similar to where Apple Pay / WebAuthn data is locked). It prevents rogue apps on the device from stealing the server session token.
+
+## 2. Request Interceptor (The outbound gate) (Lines 51-67)
+```typescript
+api.interceptors.request.use(
+    async (config) => {
+        if (config.url?.includes('/auth/')) return config; // Skip login routes
+        
+        const tokens = await getTokens();
+        if (tokens?.accessToken) {
+            config.headers.Authorization = `Bearer ${tokens.accessToken}`;
+        }
+        return config;
+    }
+);
+```
+*   **Logical Flow**: An "Interceptor" is middleware. Every time a developer types `api.post('/data')` anywhere in the app, it hits this function *first* before leaving the phone. This code reaches into the iOS/Android hardware vault, extracts the token, and physically glues it to the Network Header. This means developers never have to worry about manually attaching passwords to API queries in the UI code. 
+
+## 3. Response Interceptor (The inbound rescue operation) (Lines 69-102)
+```typescript
+api.interceptors.response.use(
+    (response) => response, // If ok, pass through
+    async (error) => {
+        const originalRequest = error.config;
+        if (error.response?.status === 401 && !originalRequest._retry) {
+            originalRequest._retry = true;
+            try {
+                // ... Hit the /refresh endpoint with the long-term backup token ...
+                const response = await axios.post(`${API_BASE_URL}/api/auth/refresh`, ...);
+                await saveTokens(response.data.accessToken, response.data.refreshToken);
+                
+                // Retry the failed initial request
+                originalRequest.headers.Authorization = `Bearer ${response.data.accessToken}`;
+                return api(originalRequest);
+            } catch (err) {
+                await clearTokens(); // Hard crash out to Login
+            }
+        }
+        return Promise.reject(error);
+    }
+);
+```
+*   **Logical Flow**: **Token Escalation & Silent Rescue**. 
+    1. Short-lived Access Tokens expire for security (e.g., every 15 mins).
+    2. The user pulls-to-refresh on the dashboard. It fires the API request. 
+    3. The server yells "401 Unauthorized" (token died). 
+    4. *This Interceptor catches the failure*. It physically pauses the app, opens a secret side-channel connection using the powerful long-term [refreshToken](file:///c:/Users/HP/Downloads/expensetracker/backend/src/main/java/com/expensetracker/auth/controller/AuthController.java#43-49), generates a brand new shiny Access Token, replaces the broken one in the vault, and *re-fires the exact dashboard request from Step 2*.
+    5. The Dashboard UI has no clue the token ever failed, it just experiences a slight 500ms delay.

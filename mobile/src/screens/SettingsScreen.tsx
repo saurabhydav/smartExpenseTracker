@@ -23,7 +23,8 @@ import {
 import {
     createBackup,
     getLastBackupTime,
-    signInToGoogleDrive
+    signInToGoogleDrive,
+    restoreFromBackup
 } from '../services/BackupService';
 import { colors, formatDate } from '../utils';
 import { processSmartSms } from '../services/SmartSmsProcessor'; // Import for testing
@@ -140,6 +141,51 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
                             Alert.alert('Success', 'Your data has been backed up securely.');
                         } else {
                             Alert.alert('Backup Failed', result.error || 'Could not complete backup.');
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    const handleRestore = async () => {
+        Alert.alert(
+            'Restore from Google Drive',
+            'This will replace all your local expenses with the latest backup from Google Drive. Are you sure you want to continue?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Restore Now',
+                    onPress: async () => {
+                        setIsBackingUp(true);
+
+                        // First sign in to Google Drive
+                        const signIn = await signInToGoogleDrive();
+                        if (!signIn.success) {
+                            Alert.alert('Sign In Required', signIn.error || 'Please sign in to Google Drive first.');
+                            setIsBackingUp(false);
+                            return;
+                        }
+
+                        // Then restore
+                        const result = await restoreFromBackup();
+                        setIsBackingUp(false);
+
+                        if (result.success) {
+                            Alert.alert(
+                                'Success',
+                                'Your data has been restored successfully.',
+                                [
+                                    {
+                                        text: 'OK',
+                                        onPress: async () => {
+                                            await refreshAll();
+                                        }
+                                    }
+                                ]
+                            );
+                        } else {
+                            Alert.alert('Restore Failed', result.error || 'Could not complete restore.');
                         }
                     },
                 },
@@ -390,7 +436,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
                         icon="cloud-download"
                         title="Restore from Backup"
                         subtitle="Download data from Google Drive"
-                        onPress={() => Alert.alert('Restore', 'This will replace your local data. Are you sure?')}
+                        onPress={handleRestore}
                     />
                 </View>
                 <Text style={styles.sectionHint}>

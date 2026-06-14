@@ -24,7 +24,6 @@ export async function generateReportData(startDate: string, endDate: string): Pr
   const categories = await getCategories();
 
   // Total spending
-  // Total spending
   const [spendingResult] = await db.executeSql(`
     SELECT COALESCE(SUM(amount), 0) as total
     FROM transactions
@@ -33,7 +32,6 @@ export async function generateReportData(startDate: string, endDate: string): Pr
   const totalSpending = spendingResult.rows.item(0).total || 0;
 
   // Total income
-  // Total income
   const [incomeResult] = await db.executeSql(`
     SELECT COALESCE(SUM(amount), 0) as total
     FROM transactions
@@ -41,7 +39,6 @@ export async function generateReportData(startDate: string, endDate: string): Pr
   `, [startDate, endDate]);
   const totalIncome = incomeResult.rows.item(0).total || 0;
 
-  // Category breakdown
   // Category breakdown
   const [categoryResult] = await db.executeSql(`
     SELECT category_id, SUM(amount) as total
@@ -65,7 +62,6 @@ export async function generateReportData(startDate: string, endDate: string): Pr
   }
 
   // Top merchants
-  // Top merchants
   const [merchantResult] = await db.executeSql(`
     SELECT merchant, SUM(amount) as total, COUNT(*) as count
     FROM transactions
@@ -85,7 +81,6 @@ export async function generateReportData(startDate: string, endDate: string): Pr
     });
   }
 
-  // Daily spending
   // Daily spending
   const [dailyResult] = await db.executeSql(`
     SELECT date, SUM(amount) as total
@@ -290,12 +285,9 @@ export async function shareReport(startDate: string, endDate: string): Promise<b
       url: `file://${filePath}`,
       title: data.title,
       type: 'application/pdf',
-    });
-
-    return true;
+    } as any);
     return true;
   } catch (error) {
-    // PDF generation failed (likely native module not linked)
     // PDF generation failed (likely native module not linked)
     console.log('PDF unavailable, switching to text mode.'); // Less alarming log
 

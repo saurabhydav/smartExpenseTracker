@@ -1,0 +1,57 @@
+# [src/services/SmsHandler.ts](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/SmsHandler.ts) - Technical Explanation
+
+This file bridges the gap between Native Android Java code and React Native JavaScript. It defines the background process that listens for new SMS messages even when the app is completely closed.
+
+## 1. Native API & Headless JS Setup (Lines 1-36)
+```typescript
+import { AppRegistry, NativeModules, Platform, PermissionsAndroid } from 'react-native';
+import { processSmartSms } from './SmartSmsProcessor';
+
+const { SmsModule } = NativeModules;
+
+async function SmsReceivedTask(data: { sender: string; body: string; timestamp: number }) {
+    try {
+        const result = await processSmartSms(data.body, data.sender);
+        if (result.success && result.needsNaming) {
+            console.log('New merchant needs naming:', result.merchant.rawName);
+        }
+    } catch (error) { ... }
+}
+
+AppRegistry.registerHeadlessTask('SmsReceivedTask', () => SmsReceivedTask);
+```
+*   **Syntax**: `NativeModules` links direct Java/Kotlin code to JavaScript. `registerHeadlessTask` registers a background service that the Android OS is allowed to wake up even if the main UI threading is killed.
+*   **Logical Flow**: 
+    1. A Java broadcast receiver catches a physical SMS ping.
+    2. It wakes up this [SmsReceivedTask](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/SmsHandler.ts#8-34) script in the background.
+    3. This script immediately hands the text payload to the `SmartSmsProcessor` to calculate if it's an expense.
+
+## 2. Permission Management (Lines 38-91)
+```typescript
+export async function requestSmsPermissions(): Promise<boolean> {
+    if (Platform.OS !== 'android') return false;
+
+    const granted = await PermissionsAndroid.requestMultiple([
+        PermissionsAndroid.PERMISSIONS.RECEIVE_SMS,
+        PermissionsAndroid.PERMISSIONS.READ_SMS,
+    ]);
+
+    return granted[PermissionsAndroid.PERMISSIONS.RECEIVE_SMS] === PermissionsAndroid.RESULTS.GRANTED;
+}
+```
+*   **Syntax**: `Platform.OS !== 'android'` bails out immediately on iPhones. (iOS strictly blocks reading SMS inboxes natively). `PermissionsAndroid.requestMultiple` triggers the OS-level "Allow this app to read SMS?" popup.
+*   **Logical Flow**: Handles the crucial security step of gating access. The app does nothing if these fail.
+
+## 3. Historic Inbox Sync (Lines 94-115)
+```typescript
+export async function getRecentSms(limit: number = 100): Promise<any[]> {
+    if (Platform.OS !== 'android') return [];
+    try {
+        if (SmsModule?.getAllSms) {
+            return await SmsModule.getAllSms(limit);
+        }
+        return [];
+    } catch (error) { ... }
+}
+```
+*   **Logical Flow**: While [SmsReceivedTask](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/SmsHandler.ts#8-34) handles *future* messages live, [getRecentSms](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/SmsHandler.ts#94-109) is invoked during onboarding to recursively read the past 100 texts so the new user instantly sees their historical charts populated upon signing up.

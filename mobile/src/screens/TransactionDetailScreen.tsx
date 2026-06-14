@@ -11,12 +11,13 @@ import {
     Alert,
     KeyboardAvoidingView,
     Switch,
+    Platform,
 } from 'react-native';
 import { useAppStore } from '../store';
-import { updateTransaction, getCategoryById, deleteTransaction } from '../database';
+import { updateTransaction, getCategoryById, deleteTransaction, type Transaction } from '../database';
 import { saveMerchantName, updateAllTransactionsForMerchant } from '../services/SmartSmsProcessor';
 import { parseExpense } from '../services/ExpenseParser';
-import { classifier } from '../services/SmartClassifier';
+
 import { colors, formatCurrency, formatDate } from '../utils';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
@@ -233,7 +234,7 @@ export default function TransactionDetailScreen({ navigation, route }: Transacti
                                         if (!user) return;
                                         setIsSaving(true);
                                         try {
-                                            const { deleteTransaction } = require('../database');
+
                                             await deleteTransaction(transaction.id, user.id);
                                             refreshAll();
                                             navigation.goBack();

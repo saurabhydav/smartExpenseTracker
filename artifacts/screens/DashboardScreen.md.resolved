@@ -1,0 +1,158 @@
+# [src/screens/DashboardScreen.tsx](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/screens/DashboardScreen.tsx) - Technical Explanation
+
+This file is the main "Home" screen of the application. It computes total spending, determines the top 5 spendiest categories, and lists recent transactions for a specific month.
+
+## 1. Imports (Lines 1-17)
+```tsx
+import React, { useEffect } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Dimensions, RefreshControl, DeviceEventEmitter } from 'react-native';
+import { useAppStore } from '../store';
+import { colors, formatCurrency, getMonthName, calculatePercentage } from '../utils';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+```
+*   **Syntax**: Imports bring in tools from React Native (for UI), the global store (for data), utils (for formatting), and vector icons (for symbols).
+*   **Logical Flow**: We gather all the necessary puzzle pieces before building the UI screen.
+
+## 2. Component Setup & Store Subscription (Lines 18-35)
+```tsx
+const { width } = Dimensions.get('window');
+
+interface DashboardScreenProps { navigation: any; }
+
+export default function DashboardScreen({ navigation }: DashboardScreenProps) {
+    const { transactions, categories, monthlyTotal, categorySpending, selectedMonth, refreshAll, setSelectedMonth, user } = useAppStore();
+```
+*   **Syntax**: `interface` defines the props expected by this React Component (it needs `navigation` to switch screens). Destructuring (`const { ... } =`) is used to grab only the necessary slices of state from the global `useAppStore()`.
+*   **Logical Flow**: By calling `useAppStore()`, this screen "subscribes" to the database. Whenever the background data changes, this component will automatically re-render and rebuild the UI with the fresh data.
+
+## 3. Data Safety Checks (Lines 37-39)
+```tsx
+    const safeCategories = Array.isArray(categories) ? categories : [];
+    const safeCategorySpending = Array.isArray(categorySpending) ? categorySpending : [];
+```
+*   **Syntax**: `Array.isArray()` returns true if the variable is a valid list. `? :` is a ternary operator (a one-line if/else statement).
+*   **Logical Flow**: **Defensive Programming**. If the database is slow to load or returns `undefined`, these lines prevent the app from crashing by feeding it an empty list `[]` instead of "nothing" (which would break loops further down).
+
+## 4. Initialization and Event Listeners (Lines 41-55)
+```tsx
+    const [refreshing, setRefreshing] = React.useState(false);
+
+    useEffect(() => {
+        refreshAll();
+        const sub = DeviceEventEmitter.addListener('TRANSACTION_UPDATED', () => refreshAll());
+        return () => sub.remove();
+    }, []);
+```
+*   **Syntax**: `useState` is local state just for this screen (to control the spinning loading wheel). `useEffect` with an empty dependency array `[]` runs exactly once when the screen opens.
+*   **Logical Flow**: 
+    1. Immediately tell the store to [refreshAll()](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/store/useAppStore.ts#146-157) data from SQLite.
+    2. Start listening on a radio frequency (`TRANSACTION_UPDATED`). If an SMS message generates a new expense in the background, this listener hears it and forces a refresh to show it instantly.
+    3. `return () => sub.remove()` is cleanup. It destroys the listener when you leave the screen to save memory.
+
+## 5. Month Navigation Math (Lines 57-70)
+```tsx
+    const navigateMonth = (direction: number) => {
+        let newMonth = selectedMonth.month + direction;
+        let newYear = selectedMonth.year;
+        if (newMonth > 12) { newMonth = 1; newYear++; } 
+        else if (newMonth < 1) { newMonth = 12; newYear--; }
+        setSelectedMonth(newYear, newMonth);
+    };
+```
+*   **Syntax**: Standard logical boundaries using `if/else`.
+*   **Logical Flow**: This handles user interaction with the `<` and `>` arrows. It does math to calculate rollovers (e.g. December (`12`) + `1` = January (`1`) of the **next year**). Then it updates the global store to trigger a data refresh for that new specific date range.
+
+## 6. Calculating Top 5 Categories (Lines 72-80)
+```tsx
+    const topCategories = (safeCategorySpending || [])
+        .map(cs => {
+            const category = safeCategories.find(c => c.id === cs.categoryId);
+            return { ...cs, category };
+        })
+        .filter(cs => cs.category)
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 5);
+```
+*   **Syntax**: Chained array methods. `.map()` transforms, `.filter()` cleans, `.sort()` orders, `.slice()` cuts. `{ ...cs, category }` uses the Object Spread operator to merge details.
+*   **Logical Flow**: 
+    1. Takes the raw financial sums ([cs](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/screens/BiometricLockScreen.tsx#41-61)).
+    2. Searches the database (`c`) to find the matching Name/Icon/Color for that category ID.
+    3. Merges them together so we have Money + Icon in one object.
+    4. Trashes any "ghost" data where the category was deleted.
+    5. Sorts the list from Highest Spender to Lowest Spender (`b - a`).
+    6. Keeps only the top 5 winners to prevent screen clutter.
+
+## 7. The Main Structural UI (`<ScrollView>`) (Lines 82-130)
+```tsx
+    return (
+        <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+            {/* Header: Greeting user */}
+            <Text style={styles.greeting}>Hello, {user?.name?.split(' ')[0] || 'User'}</Text>
+            
+            {/* Month Selector */}
+            <TouchableOpacity onPress={() => navigateMonth(-1)}> <Icon name="chevron-left" /> </TouchableOpacity>
+            
+            {/* Big Total Card */}
+            <Text style={styles.totalAmount}>{formatCurrency(monthlyTotal)}</Text>
+            <Text>{transactions.filter(t => t.type === 'debit').length} expenses</Text>
+        </ScrollView>
+    )
+```
+*   **Syntax**: JSX (JavaScript XML). It looks like HTML but supports embedded logic inside curly braces `{}`. Example: `user?.name?.split(' ')[0]` (Optional Chaining to grab just the first name safely).
+*   **Logical Flow**: Defines the skeletal layout of the top half of the screen. Binds the [navigateMonth](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/screens/DashboardScreen.tsx#57-71) functions to the arrow buttons, hooks up the string formatter for the big balance box, and filters the global `transactions` array down to just "debits" to count how many purchases you made.
+
+## 8. Dynamic List Rendering - "By Category" (Lines 131-166)
+```tsx
+             <View style={styles.section}>
+                {topCategories.length > 0 ? (
+                    topCategories.map((item, index) => (
+                        <View key={item.categoryId} style={styles.categoryRow}>
+                            <View style={[styles.categoryIcon, { backgroundColor: item.category?.color + '20' }]}>
+                                <Icon name={item.category?.icon} color={item.category?.color} />
+                            </View>
+                            <View style={[styles.progressFill, { width: `${calculatePercentage(item.total, monthlyTotal)}%` }]} />
+                            <Text>{formatCurrency(item.total)}</Text>
+                        </View>
+                    ))
+                ) : ( <Text>No spending</Text> )}
+             </View>
+```
+*   **Syntax**: `array.map()` inside JSX is the React way to generate dynamic lists. Every iterated item requires a unique `key=` prop so React can track it efficiently. Dynamic styles accept arrays `style={[ defaultStyle, { inlineOverride } ]}`.
+*   **Logical Flow**: 
+    1. Checks if `topCategories` has things in it. If not, fallback to "No spending".
+    2. For every category in the Top 5, generate a UI block horizontally containing:
+       - The colored Icon (uses hex code + '20' for 20% opacity background).
+       - The title and a progress bar line. The width percentage is calculated live by comparing the category total to the monthly total.
+       - The formatted money text on the far right.
+
+## 9. Dynamic List Rendering - "Recent Transactions" (Lines 168-205)
+```tsx
+            {transactions.slice(0, 5).map((transaction) => {
+                const category = safeCategories.find(c => c.id === transaction.categoryId);
+                return (
+                    <TouchableOpacity key={transaction.id} onPress={() => navigation.navigate('TransactionDetail', { id: transaction.id })}>
+                        <Icon name={category?.icon || 'receipt'} />
+                        <Text>{transaction.merchant}</Text>
+                        <Text style={{ color: transaction.type === 'debit' ? colors.debit : colors.credit }}>
+                            {transaction.type === 'debit' ? '-' : '+'}{formatCurrency(transaction.amount)}
+                        </Text>
+                    </TouchableOpacity>
+                );
+            })}
+```
+*   **Syntax**: `navigation.navigate('ScreenName', { props })` triggers a screen change and passes data forward.
+*   **Logical Flow**: 
+    1. Truncate the global transactions list to just the first 5 (`slice(0,5)`).
+    2. Lookup the category icon again on the fly.
+    3. Generate a highly touchable row (`TouchableOpacity`) that hooks into the Navigator to open a detailed view of that specific receipt ID if clicked.
+    4. Automatically color-code the math (+ is Green, - is Red) based on if it was income or an expense.
+
+## 10. Stylesheet Definitions (Lines 212-387)
+```tsx
+const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    // ...
+});
+```
+*   **Syntax**: `StyleSheet.create` is essentially CSS written in JavaScript object syntax using React Native layout engines (Flexbox).
+*   **Logical Flow**: Separates the design layout rules (padding, fonts, colors, flex arrangements) from the visual rendering logic to keep the component code slightly cleaner.

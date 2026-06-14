@@ -1,0 +1,54 @@
+# [src/screens/LoginScreen.tsx](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/screens/LoginScreen.tsx) - Technical Explanation
+
+This file connects user input (Email/Password) to the Cloudflare backend via the [AuthService](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/authService.ts#30-62) class.
+
+## 1. Local State Hooks & Store Access (Lines 24-30)
+```tsx
+export default function LoginScreen({ navigation }: LoginScreenProps) {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+
+    const { setUser, setAuthenticated } = useAppStore();
+```
+*   **Logical Flow**: Tracks what the user is currently typing. It attaches directly to the global Zustand instance (`useAppStore`) so it can mutate the global state of the app once the login succeeds.
+
+## 2. Validation & Authentication Hook (Lines 32-49)
+```tsx
+    const handleLogin = async () => {
+        if (!email.trim() || !password.trim()) { ... }
+
+        setIsLoading(true);
+        try {
+            const response = await authService.login({ email, password });
+            setUser(response.user);
+            setAuthenticated(true);
+        } catch (error: any) {
+            const errorMessage = error.response?.data?.message || 'Invalid email or password';
+            Alert.alert('Login Failed', errorMessage);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+```
+*   **Logical Flow**: 
+    1. Blocks submission if the text boxes are entirely empty spaces.
+    2. Flips `isLoading` to `true` (which physically transforms the 'Log In' button into a spinning circle animation to prevent double-tapping).
+    3. Calls the [api.ts](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/api.ts) background script via `authService.login`.
+    4. Upon receiving the JWT tokens, it pushes the [user](file:///c:/Users/HP/Downloads/expensetracker/backend/src/main/java/com/expensetracker/config/KafkaConfig.java#21-28) data into the Zustand global memory and flips [setAuthenticated](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/store/useAppStore.ts#74-75) to TRUE. The [App.tsx](file:///c:/Users/HP/Downloads/expensetracker/mobile/App.tsx) root file listens to this boolean and automatically unmounts the Login screen, replacing it with the Dashboard.
+
+## 3. Form Input Components (Lines 63-94)
+```tsx
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Email"
+                        value={email}
+                        onChangeText={setEmail}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                    />
+```
+*   **Syntax**: Modifying native iOS/Android OS-level keyboard settings.
+*   **Logical Flow**: Adding `keyboardType="email-address"` forces the Android/iOS keyboard to permanently pop up the `@` and `.com` symbols for faster typing. `autoCapitalize="none"` prevents phones from automatically capitalizing the first letter of their email (which can sometimes cause server login failures). `secureTextEntry={!showPassword}` dynamically turns password bullets (••••••) into plaintext if the user taps the eyeball 'Reveal' icon.

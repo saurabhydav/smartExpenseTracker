@@ -1,0 +1,75 @@
+# [src/services/AnalyticsService.ts](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/AnalyticsService.ts) - Technical Explanation
+
+This file performs all the heavy mathematics and data science for the app. It calculates burn rates, predicts when the user will run out of money, generates comparisons, and powers the "Insights" and "Charts" screens.
+
+## 1. Time-Window Math Setup (Lines 33-46)
+```typescript
+export async function calculateBurnRate(userId: number, budgetLimit?: number): Promise<BurnRateData> {
+    const now = new Date();
+    const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+    // ...
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+```
+*   **Logical Flow**: To calculate a "Burn Rate" (how fast you spend money), the engine doesn't just look at "This Month". If it's May 1st, looking at just "May" is useless because there's only 1 day of data. Instead, it uses a **Rolling 30-Day Window** (e.g., April 1st to May 1st) to ensure the math always has a stable, month-sized sample size regardless of what day it is.
+
+## 2. SQL Grouping for the Rolling Window (Lines 48-61)
+```typescript
+    const [result] = await db.executeSql(`
+        SELECT date, SUM(amount) as total
+        FROM transactions
+        WHERE user_id = ? AND type = 'debit' AND date >= ?
+        GROUP BY date ORDER BY date
+    `, [userId, dateLimit]);
+```
+*   **Syntax**: `GROUP BY date` tells SQLite to collapse hundreds of individual receipts into a daily summary format.
+*   **Logical Flow**: It retrieves an array where each item is exactly one day and the total spent that day.
+
+## 3. Core Burn Rate Formula (Lines 63-95)
+```typescript
+    const totalLast30Days = dailySpending.reduce((sum, d) => sum + d.total, 0);
+    const dailyAverage = totalLast30Days / 30;
+    
+    // ... Fetch ONLY this calendar month's actuals ...
+    
+    const monthlyProjection = spentThisMonth + (dailyAverage * daysRemaining);
+
+    let daysUntilBudgetExhausted = null;
+    if (budgetLimit && dailyAverage > 0) {
+        const remaining = budgetLimit - spentThisMonth;
+        daysUntilBudgetExhausted = Math.floor(remaining / dailyAverage);
+    }
+```
+*   **Logical Flow**: 
+    1. Averages the rolling 30-day window to find the general `dailyAverage`.
+    2. Uses a localized query to find exactly what was spent in *this calendar month*.
+    3. **Projection Engine**: It predicts your final end-of-month bill by taking what you've actually spent so far, and simulating the remaining days using your historical daily average.
+    4. **Exhaustion Engine**: Calculates how many days until you hit zero by dividing your remaining limit by your daily burn velocity.
+
+## 4. Trend Calculation (Lines 97-116)
+```typescript
+    if (dailySpending.length >= 2) {
+        const midpoint = Math.floor(dailySpending.length / 2);
+        const firstHalf = dailySpending.slice(0, midpoint);
+        const secondHalf = dailySpending.slice(midpoint);
+
+        // ... Calculate array averages ...
+        trendPercentage = ((secondHalfAvg - firstHalfAvg) / firstHalfAvg) * 100;
+        if (trendPercentage > 10) trend = 'increasing';
+        else if (trendPercentage < -10) trend = 'decreasing';
+    }
+```
+*   **Logical Flow**: To tell the user if their spending is actively getting worse, the engine splits the 30-day window in half. It compares the average of the *last 15 days* directly against the *first 15 days*. A positive spike indicates a recent, aggressive loss of control.
+
+## 5. Insight English Generator (Lines 181-251)
+```typescript
+export async function generateInsights(userId: number, totalBudget?: number): Promise<SpendingInsight[]> {
+    const insights: SpendingInsight[] = [];
+    const burnRate = await calculateBurnRate(...);
+    
+    if (burnRate.daysUntilBudgetExhausted <= 5) {
+        insights.push({ type: 'warning', title: 'Budget Alert', ... });
+    }
+    // ... Multiple warning boundaries ...
+```
+*   **Logical Flow**: This translates raw decimal math into human-readable alert cards. It feeds the results of the Burn Rate and Monthly Comparison functions through a series of `if/else` stress-test boundaries. If the user hits a dangerous threshold (e.g., 5 days until broke), it pushes a red 'warning' card to the dashboard.

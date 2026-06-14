@@ -1,0 +1,94 @@
+# [src/screens/TransactionsScreen.tsx](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/screens/TransactionsScreen.tsx) - Technical Explanation
+
+This file renders the full, scrollable list of all transactions. It includes search functionality and filter tabs (All, Income, Expense) to help the user find specific records.
+
+## 1. Imports and Setup (Lines 1-25)
+```tsx
+import React, { useState } from 'react';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { useAppStore } from '../store';
+import { colors, formatCurrency, formatDate } from '../utils';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+
+export default function TransactionsScreen({ navigation }: TransactionsScreenProps) {
+    const { transactions, categories } = useAppStore();
+    const safeCategories = Array.isArray(categories) ? categories : [];
+```
+*   **Syntax**: Standard React Native imports. `useState` is used for managing the search bar text and the active filter tab. Destructuring brings in global state.
+*   **Logical Flow**: Similar to Dashboard, it hooks into the global store to access all `transactions` and `categories`. It implements the same defensive check (`Array.isArray`) to prevent crashes if the database returns undefined.
+
+## 2. Local State Management (Lines 26-27)
+```tsx
+    const [searchQuery, setSearchQuery] = useState('');
+    const [filterType, setFilterType] = useState<'all' | 'debit' | 'credit'>('all');
+```
+*   **Syntax**: `useState<Type>(defaultValue)` enforces that `filterType` can strictly only ever be one of those three exact strings.
+*   **Logical Flow**: These two variables control the list. One holds whatever the user typed in the search box (e.g., "Uber"), and the other remembers which button they clicked ("Expenses" vs "Income").
+
+## 3. Dynamic Filtering Logic (Lines 29-33)
+```tsx
+    const filteredTransactions = transactions.filter(t => {
+        const matchesSearch = t.merchant.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesType = filterType === 'all' || t.type === filterType;
+        return matchesSearch && matchesType;
+    });
+```
+*   **Syntax**: `.filter()` loops through every item and asks "Should I keep you?". `.toLowerCase()` ensures that searching for "uber" still finds "UBER". `.includes()` checks if the string contains the substring.
+*   **Logical Flow**: This runs *every time* the user types a letter or clicks a filter. 
+    1. It checks if the merchant name contains the search text.
+    2. It checks if the transaction type matches the selected tab.
+    3. If BOTH conditions are true (`&&`), it keeps the transaction in the list. This creates the final `filteredTransactions` array that actually gets rendered.
+
+## 4. The Render Function (Lines 35-60)
+```tsx
+    const renderTransaction = ({ item }: { item: Transaction }) => {
+        const category = safeCategories.find(c => c.id === item.categoryId);
+        return (
+            <TouchableOpacity onPress={() => navigation.navigate('TransactionDetail', { id: item.id })}>
+                {/* ... UI structure mirroring Dashboard recent list ... */}
+            </TouchableOpacity>
+        );
+    };
+```
+*   **Syntax**: [({ item })](file:///c:/Users/HP/Downloads/expensetracker/mobile/App.tsx#121-245) destructures the argument. This is specifically required by React Native's `<FlatList>` component.
+*   **Logical Flow**: Instead of building the list right inside the JSX, we define a "Row Builder" function. It takes one transaction (`item`), finds its category icon, constructs the Touchable row, and returns it.
+
+## 5. Main UI Structure (Lines 62-120)
+
+### The Search Bar
+```tsx
+            <View style={styles.searchContainer}>
+                <Icon name="search" ... />
+                <TextInput value={searchQuery} onChangeText={setSearchQuery} ... />
+                {searchQuery.length > 0 && (
+                    <TouchableOpacity onPress={() => setSearchQuery('')}> <Icon name="close" /> </TouchableOpacity>
+                )}
+            </View>
+```
+*   **Syntax**: `onChangeText={setSearchQuery}` links the physical keyboard input directly into the React logical state. 
+*   **Logical Flow**: Displays the magnifying glass. The conditional `&&` block automatically draws a "Clear (X)" button on the right side ONLY if there is actually text in the box. Clicking 'X' instantly resets the search to blank.
+
+### The Filter Tabs
+```tsx
+            <View style={styles.filterTabs}>
+                {(['all', 'debit', 'credit'] as const).map((type) => (
+                    <TouchableOpacity ... onPress={() => setFilterType(type)}>
+                        <Text>{type === 'all' ? 'All' : type === 'debit' ? 'Expenses' : 'Income'}</Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
+```
+*   **Syntax**: inline array `.map()`.
+*   **Logical Flow**: Generates three buttons. It uses dynamic styles to highlight whichever button matches the current `filterType` state, and sets [onPress](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/screens/SettingsScreen.tsx#237-238) to change that state when clicked.
+
+### The FlatList
+```tsx
+            <FlatList
+                data={filteredTransactions}
+                renderItem={renderTransaction}
+                keyExtractor={(item) => item.id.toString()}
+                ListEmptyComponent={<Text>No transactions found</Text>}
+            />
+```
+*   **Syntax**: `<FlatList>` is a highly-optimized React Native component for long lists.
+*   **Logical Flow**: Unlike a standard `.map()`, `FlatList` doesn't load all 1,000 receipts at once. It only loads the ~10 that fit on your screen, recycling memory as you scroll (lazy loading). You feed it the data array, tell it *how* to draw one row (`renderItem`), and provide an empty fallback if the list is blank.

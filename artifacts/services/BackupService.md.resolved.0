@@ -1,0 +1,52 @@
+# [src/services/BackupService.ts](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/BackupService.ts) - Technical Explanation
+
+This file contains placeholder scaffolding for a future feature: safely copying the raw SQLite database off the phone and uploading it to a hidden folder in the user's Google Drive.
+
+## 1. Platform Path Resolution (Lines 11-18)
+```typescript
+const getDatabasePath = (): string => {
+    if (Platform.OS === 'android') {
+        return '/data/data/com.expensetracker/databases/expense_tracker.db';
+    }
+    return '';
+};
+```
+*   **Logical Flow**: SQLite files are literal `.db` files stored deep within the phone's sandboxed hard drive. This function locates the exact file path required to read it as raw binary data.
+
+## 2. Encryption Scaffolding (Lines 29-52)
+```typescript
+async function encryptData(data: ArrayBuffer): Promise<ArrayBuffer> {
+    // TODO: Implement actual AES-256 encryption
+    console.log('Encryption placeholder');
+    return data;
+}
+```
+*   **Logical Flow**: Because financial data is highly sensitive, dumping a raw accessible SQLite file into Google Drive is a security risk. This outlines the requirement to intercept the binary blob and encrypt it via AES-256 (likely using a biometric-derived key) before it hits the internet.
+
+## 3. Google Drive AppData Scaffolding (Lines 54-109)
+```typescript
+// Scopes needed:
+// - https://www.googleapis.com/auth/drive.appdata (hidden app folder)
+```
+*   **Logical Flow**: Activating Drive backups requires utilizing `drive.appdata` tokens. This ensures the backup goes into a hidden system partition on the user's Google Drive, rather than dropping a weird `.db.enc` file directly into their visible "My Drive" folder where they might accidentally delete it.
+
+## 4. The Backup Routine Outline (Lines 111-168)
+```typescript
+export async function createBackup(): Promise<{ success: boolean; error?: string }> {
+    // Step 1: Read the SQLite database file
+    const dbPath = getDatabasePath();
+    // Step 2: Encrypt the database
+    // Step 3: Upload to Google Drive appDataFolder via multipart upload
+    // Step 4: Save timestamp to AsyncStorage so UI knows it succeeded.
+```
+*   **Logical Flow**: Traces the exact sequential logic necessary to execute the backup. Currently entirely commented out/stubbed, awaiting the installation of heavy Native modules like `react-native-google-signin` and `react-native-fs` (File System tools).
+
+## 5. Automatic Execution Background Config (Lines 244-291)
+```typescript
+export async function setAutoBackupEnabled(enabled: boolean): Promise<void> {
+    await AsyncStorage.setItem(BACKUP_ENABLED_KEY, enabled.toString());
+    if (enabled) scheduleAutoBackup();
+    else cancelAutoBackup();
+}
+```
+*   **Logical Flow**: Ties the UI toggle switch to the device scheduler. A background task would be registered with the OS, telling it to wake the phone up at 2 AM, check if the device is plugged in and on Wi-Fi, and automatically fire the backup routine without waking the user.

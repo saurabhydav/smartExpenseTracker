@@ -1,0 +1,52 @@
+# [src/screens/BudgetScreen.tsx](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/screens/BudgetScreen.tsx) - Technical Explanation
+
+This file merges the [Database](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/database/database.ts#248-255) rules with the `Analytics` calculations to display dynamic progress bars that fill up as the user spends money.
+
+## 1. Complex Array Mapping & Math (Lines 52-67)
+```tsx
+    const categoryData = safeCategories.map(category => {
+        const spending = safeCategorySpending.find(cs => cs.categoryId === category.id);
+        return {
+            ...category,
+            spent: spending?.total || 0,
+            remaining: category.budgetLimit ? category.budgetLimit - (spending?.total || 0) : null,
+            percentage: category.budgetLimit
+                ? calculatePercentage(spending?.total || 0, category.budgetLimit)
+                : 0,
+        };
+    }).sort((a, b) => b.spent - a.spent);
+```
+*   **Logical Flow**: 
+    1. It loops through the `categories` array (which contains budget limits).
+    2. Uses `.find()` to cross-reference the `categorySpending` aggregate array (which comes from the Dashboard's SQL calculation).
+    3. Calculates three new properties on the fly: Exactly how much is left (`remaining`), mathematically what percentage of the bar should be filled (`percentage`), and then forcefully sorts the array so the categories with the highest spending always appear at the top.
+
+## 2. CRUD Operations & State Overrides (Lines 68-114)
+```tsx
+    const handleAddCategory = async (name: string, icon: string, color: string, budget: number | null) => { ... }
+    const handleSaveBudget = () => {
+        const budget = budgetInput.trim() === '' ? null : parseFloat(budgetInput);
+        updateCategoryBudget(editingCategory.id, user.id, budget);
+        loadCategories(); // Force Refresh
+        setEditingCategory(null);
+    };
+```
+*   **Logical Flow**: If a user updates their budget (e.g., changes Food from ₹5000 to ₹6000), it executes a direct SQLite `UPDATE` query. Immediately after the DB resolves, it calls [loadCategories()](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/screens/MerchantContactsScreen.tsx#53-63), which forces the global Zustand store to re-fetch *everything*, causing the UI progress bars to instantly snap to their new percentages without needing an app restart.
+
+## 3. Dynamic Progress Bar UI (Lines 116-120 & 203-228)
+```tsx
+    const getProgressColor = (percentage: number): string => {
+        if (percentage >= 100) return colors.debit;
+        if (percentage >= 80) return colors.warning;
+        return colors.credit;
+    };
+    
+    // UI Markup
+    <View style={[styles.progressFill, { 
+        width: `${Math.min(category.percentage, 100)}%`, 
+        backgroundColor: getProgressColor(category.percentage) }]} 
+    />
+```
+*   **Logical Flow**: A physical representation of data. It calculates HTML/CSS `width` dynamically via inline arrays (`width: '85%'`).
+    *   `Math.min(percentage, 100)` prevents the UI from breaking. If the user spent 150%, the bar would try to stretch outside the boundaries of the phone screen; this stops it at a maximum of 100% physically.
+    *   The [getProgressColor](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/screens/BudgetScreen.tsx#116-121) helper function applies a traffic-light warning system: Green (Safe) -> Yellow/Warning (80% reached) -> Red (100% Broken).

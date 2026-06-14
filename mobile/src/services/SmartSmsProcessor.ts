@@ -89,7 +89,7 @@ export async function validateTransactionSms(sms: string, sender: string): Promi
     // Check whitelist
     const isKnownBank = BANK_SENDER_IDS.some(regex => regex.test(sender));
     if (isKnownBank) {
-        confidence += 0.5;
+        confidence += 0.3; // Lower weight for sender, rely more on content
         reasons.push('Known Bank Sender');
     }
 
@@ -101,9 +101,13 @@ export async function validateTransactionSms(sms: string, sender: string): Promi
         }
     }
 
+    // Stronger weight for content
     if (bankMatches >= 2) {
-        confidence += 0.5;
-        reasons.push('Contains transaction keywords');
+        confidence += 0.7;
+        reasons.push('Strong transaction keywords');
+    } else if (bankMatches === 1) {
+        confidence += 0.3; // Partial match
+        reasons.push('Some transaction keywords');
     }
 
     // 3. SPAM CHECK
@@ -118,13 +122,16 @@ export async function validateTransactionSms(sms: string, sender: string): Promi
         return { isValid: false, isTransaction: false, confidence: 0, reason: 'Contains spam keywords' };
     }
 
-    // Strict Mode: If it's a known bank, we are more lenient on keywords.
-    // If unknown sender, we require high keyword match.
-    const threshold = isKnownBank ? 0.4 : 0.8;
+    // New Threshold: 0.6
+    // - Unknown Sender + Strong Keywords = 0 + 0.7 = 0.7 (PASS)
+    // - Known Sender + Strong Keywords = 0.3 + 0.7 = 1.0 (PASS)
+    // - Known Sender + Weak Keywords = 0.3 + 0.3 = 0.6 (PASS)
+    // - Unknown Sender + Weak Keywords = 0 + 0.3 = 0.3 (FAIL)
+    const threshold = 0.6;
 
     return {
         isValid: confidence >= threshold,
-        isTransaction: bankMatches >= 2,
+        isTransaction: bankMatches >= 1,
         confidence,
         reason: reasons.join('; '),
     };
@@ -246,7 +253,7 @@ function getSuggestedName(rawName: string): string {
  * Smart SMS processor - the main entry point
  * Works like phone contacts: learns merchant names
  */
-import { getTokens } from './api';
+
 
 // ...
 
@@ -281,13 +288,6 @@ export async function processSmartSms(
             console.error('Failed to retrieve userId for background validation', e);
         }
     }
-
-    if (!currentUserId) {
-        console.log('No user logged in, skipping SMS processing');
-        return { success: false, error: 'User not logged in' };
-    }
-
-
 
     if (!currentUserId) {
         console.log('No user logged in, skipping SMS processing');
@@ -398,9 +398,6 @@ export async function processSmartSms(
     };
 }
 
-/**
- * Resolve or create account based on last 4 digits
- */
 /**
  * Resolve or create account based on last 4 digits
  */

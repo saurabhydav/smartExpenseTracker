@@ -1,4 +1,4 @@
-import { getMerchantMapping, insertMerchantMapping, insertTransaction, getCategories } from '../database';
+import { getCategories } from '../database';
 
 export interface ParsedExpense {
     amount: number;

@@ -1,0 +1,51 @@
+# [src/screens/InsightsScreen.tsx](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/screens/InsightsScreen.tsx) - Technical Explanation
+
+This file is a pure UI consumer. It doesn't calculate math directly; instead, it imports `AnalyticsService` and `SubscriptionService`, waits for them to do the heavy lifting, and paints the results to the screen via `react-native-chart-kit` graphs and cards.
+
+## 1. Multi-Threaded Loading (Lines 53-74)
+```tsx
+    const loadData = async () => {
+        setIsLoading(true);
+        try {
+            const rate = await calculateBurnRate(...);
+            setBurnRate(rate);
+
+            const insightsList = await generateInsights(...);
+            setInsights(insightsList);
+
+            const subs = await getActiveSubscriptions(...);
+            // ...
+            const chart = await getChartData(...);
+            setChartData(chart);
+        } catch (error) { ... }
+        setIsLoading(false);
+    };
+```
+*   **Logical Flow**: Because these calculation functions are massively heavy SQLite operations aggregating hundreds of rows, the UI blocks rendering using a spinner. This function sequentially queries all 4 analytic engines and saves their results into local state arrays, which unlocks the UI render path.
+
+## 2. Advanced SVG Charting (Lines 126-133 & 198-223)
+```tsx
+    const chartLabels = chartData.filter((_, i) => i % 5 === 0).map(d => d.date.slice(8));
+    const chartValues = chartData.map(d => d.amount);
+
+    <LineChart
+        data={{ labels: chartLabels, datasets: [{ data: chartValues }] }}
+        width={width - 48}
+        height={180}
+        bezier
+        // ...
+    />
+```
+*   **Syntax**: `i % 5 === 0`.
+*   **Logical Flow**: Maps the backend [ChartData](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/AnalyticsService.ts#253-283) engine into visual nodes. If it printed 30 dates across a small phone screen, the text would overlap and look terrible. The `filter` line uses the modulo operator (`% 5`) to only print a label on the X-axis every 5th day, while keeping the data points fully intact for the Bezier curve calculation.
+
+## 3. Subscription Polling & Sharing (Lines 76-102)
+```tsx
+    const handleDetectSubscriptions = async () => { ... }
+    const handleExportReport = async () => {
+        setIsExporting(true);
+        await shareCurrentMonthReport();
+        setIsExporting(false);
+    };
+```
+*   **Logical Flow**: Exposes interactive buttons directly to backend engines. [shareCurrentMonthReport](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/ReportService.ts#325-335) creates the PDF string offline and calls the Native Share Drawer logic directly without the UI needing to process it. [handleDetectSubscriptions](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/screens/InsightsScreen.tsx#76-90) forces the algorithm to brute-force recalculate all recurring payments and overwrite the state dynamically.

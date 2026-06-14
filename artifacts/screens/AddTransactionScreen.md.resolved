@@ -1,0 +1,93 @@
+# [src/screens/AddTransactionScreen.tsx](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/screens/AddTransactionScreen.tsx) - Technical Explanation
+
+This file is responsible for the manual entry form. If a user makes a cash purchase or an expense was missed by the SMS parser, they use this screen to manually type in the details.
+
+## 1. Local State Setup (Lines 1-35)
+```tsx
+export default function AddTransactionScreen({ navigation }: AddTransactionScreenProps) {
+    const [amount, setAmount] = useState('');
+    const [merchant, setMerchant] = useState('');
+    const [type, setType] = useState<'debit' | 'credit'>('debit');
+    const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [notes, setNotes] = useState('');
+```
+*   **Syntax**: Multiple `useState` declarations. `new Date().toISOString().split('T')[0]` generates a string like `"2024-05-12"`.
+*   **Logical Flow**: Because this is a form, we need a string variable to capture exactly what the user is typing into every single input box. It defaults the date to "Today" automatically.
+
+## 2. Validation & Save Logic (Lines 37-74)
+```tsx
+    const handleSave = async () => {
+        const parsedAmount = parseFloat(amount);
+
+        if (isNaN(parsedAmount) || parsedAmount <= 0) {
+            Alert.alert('Error', 'Please enter a valid amount'); return;
+        }
+        if (!merchant.trim()) { ... }
+
+        try {
+            await insertTransaction({
+                amount: parsedAmount, type, merchant: merchant.trim(),
+                categoryId: selectedCategory, accountId: null, userId: user.id,
+                date, rawSms: null, notes: notes.trim() || null,
+            }, false); // false = Allow duplicates
+
+            await refreshAll();
+            navigation.goBack();
+        } catch (error) { ... }
+    };
+```
+*   **Syntax**: `parseFloat()` attempts to turn text like `"50.50"` into a real JS number. `isNaN()` checks if that failed (e.g., they typed "Hello"). `.trim()` rips blank spaces off the ends of text.
+*   **Logical Flow**:
+    1. **Validation Checks:** Ensures the user didn't submit a blank page or type letters into the price box. Bounces them with an error alert if they did.
+    2. **Execution:** Bundles up all the state variables into a massive [Transaction](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/database/schema.ts#14-28) object. 
+    3. Calls the database [insertTransaction](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/database/database.ts#268-336) function. Note the `false` arg: Since this is manual, we bypass the "SMS duplicate checker". If a user manually types the same coffee purchase twice, we assume they meant to.
+    4. Refreshes the global store so the Dashboard registers the new cash expense instantly.
+
+## 3. The UI - Form Inputs (Lines 117-219)
+
+### Amount Input
+```tsx
+                <View style={styles.amountContainer}>
+                    <Text style={styles.currencySymbol}>₹</Text>
+                    <TextInput
+                        value={amount}
+                        onChangeText={setAmount}
+                        keyboardType="decimal-pad"
+                    />
+                </View>
+```
+*   **Syntax**: `<TextInput>` is the React Native text box. `keyboardType="decimal-pad"` tells the OS which keyboard to raise.
+*   **Logical Flow**: It displays a large input field. By restricting the keyboard to `decimal-pad`, it physically prevents the user from typing alphabetical letters, assisting with our validation step later.
+
+### Form Text Fields (Merchant, Date, Notes)
+```tsx
+                    <View style={styles.inputGroup}>
+                        <Text style={styles.label}>Merchant / Description</Text>
+                        <TextInput
+                            placeholder="e.g., Swiggy, Amazon"
+                            value={merchant}
+                            onChangeText={setMerchant}
+                        />
+                    </View>
+```
+*   **Syntax**: Standard two-way binding (`value={var}` + `onChangeText={setVar}`).
+*   **Logical Flow**: Standard form fields. Any keystroke instantly updates the matching React state variable so [handleSave](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/screens/TransactionDetailScreen.tsx#57-97) has instant access to the final text when clicked.
+
+### OS-Specific Styling Physics (Line 132 & 174)
+```tsx
+<View style={[styles.inputGroup, Platform.OS === 'android' ? { elevation: 10, zIndex: 100 } : { zIndex: 100 }]}>
+```
+*   **Syntax**: `Platform.OS === 'android'` conditionals.
+*   **Logical Flow**: Android and iOS handle "overlapping boxes" (z-index) differently. Since the Category selection box acts like a dropdown, it needs to physically hover *above* the Merchant input box below it. Android requires the specific `elevation` shadow property to allow a box to break boundaries, while iOS just needs standard `zIndex`.
+
+## 4. Toggle Buttons ('Income' vs 'Expense') (Lines 95-115)
+```tsx
+                    <TouchableOpacity
+                        style={[styles.typeButton, type === 'debit' && styles.typeButtonActiveDebit]}
+                        onPress={() => setType('debit')}
+                    >
+                    {/* ... */}
+```
+*   **Syntax**: Dynamic styling array (`[baseStyle, condition && activeStyle]`).
+*   **Logical Flow**: Two giant buttons next to each other. Clicking one sets the state `type = 'debit'`. The dynamic styling checks `type === 'debit'` to apply the Red/Green highlighted background color instantly.

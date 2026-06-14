@@ -1,0 +1,37 @@
+# `index.ts` Wrapper Files - Technical Explanation
+
+In the codebase, you will see `index.ts` files inside folders like `/components`, `/store`, and `/utils`.
+
+## Example (`src/components/index.ts`)
+```typescript
+export { default as MerchantNamingModal } from './MerchantNamingModal';
+```
+
+## Example (`src/utils/index.ts`)
+```typescript
+export * from './helpers';
+```
+
+## Technical Flow & Purpose
+
+This is a structural design pattern in JavaScript/TypeScript called **"Barrel Files"**.
+
+### The Problem
+Without an `index.ts` file, if `DashboardScreen` needs 3 components and 2 helpers, the import lines become extremely messy:
+```typescript
+import AddCategoryModal from '../components/AddCategoryModal';
+import MerchantNamingModal from '../components/MerchantNamingModal';
+import { formatCurrency } from '../utils/helpers';
+import { formatDate } from '../utils/helpers';
+```
+
+### The Solution (Barrel Files)
+The `index.ts` acts as the "front door" for that entire folder. It gathers everything inside the folder and re-exports it in one spot.
+
+By creating these `index.ts` wrappers, the `DashboardScreen` can now import everything cleanly on a single line:
+```typescript
+import { AddCategoryModal, MerchantNamingModal } from '../components';
+import { formatCurrency, formatDate } from '../utils';
+```
+
+When you import from a folder path like `../components`, Node.js automatically looks for a file specifically named `index.ts` inside that folder to figure out what it should hand over.

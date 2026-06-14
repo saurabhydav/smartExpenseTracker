@@ -1,0 +1,86 @@
+# [src/components/AddMerchantModal.tsx](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/components/AddMerchantModal.tsx) - Technical Explanation
+
+This file contains the UI component for adding or editing a manual "Merchant Rule". It instructs the Smart SMS parser to auto-assign a specific display name and category whenever a certain raw text string appears in an SMS.
+
+## 1. Interface and Stores (Lines 1-40)
+```tsx
+import { saveMerchantName } from '../services/SmartSmsProcessor';
+import { useAppStore } from '../store';
+// ...
+interface AddMerchantModalProps {
+    visible: boolean;
+    onClose: () => void;
+    onSave: () => void;
+    initialData?: { id?: number; smsName: string; displayName: string; categoryId: number | null; };
+}
+```
+*   **Syntax**: `initialData?` (with the question mark) denotes an *optional* prop. This component doubles as both a "Create" and an "Edit" form depending on whether this data is passed.
+*   **Logical Flow**: Unlike the [AddCategoryModal](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/components/AddCategoryModal.tsx#31-129), this component handles its own database saving by importing [saveMerchantName](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/SmartSmsProcessor.ts#157-193) and grabbing the `user.id` directly from `useAppStore`.
+
+## 2. Population and Loading (Lines 41-64)
+```tsx
+    useEffect(() => {
+        if (visible) {
+            loadCategories();
+            if (initialData) {
+                setSmsName(initialData.smsName);
+                // ... populate edits
+            } else {
+                setSmsName('');
+                // ... blank slate
+            }
+        }
+    }, [visible, initialData]);
+```
+*   **Syntax**: `useEffect` runs specifically when `visible` or `initialData` changes.
+*   **Logical Flow**:
+    1. Wait for the popup to be commanded open (`visible = true`).
+    2. Fire off a SQL query to load the user's categories ([loadCategories](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/components/AddMerchantModal.tsx#56-65)).
+    3. Check: "Are we Editing?" -> Yes: fill text boxes with old data so it can be tweaked. No: Wipe all text boxes clean for a fresh entry.
+
+## 3. Saving the Rule (Lines 66-80)
+```tsx
+    const handleSave = async () => {
+        if (!smsName.trim() || !displayName.trim() || !user) return;
+        await saveMerchantName(smsName.trim(), displayName.trim(), selectedCategory, user.id);
+        onSave();
+        onClose();
+    };
+```
+*   **Syntax**: Early return (`return;`) aborts the function immediately if requirements aren't met.
+*   **Logical Flow**: 
+    1. Validates inputs aren't blank.
+    2. Pipes the data to the `SmartSmsProcessor` service class, which handles the complex SQL `INSERT/UPDATE` logic internally.
+    3. Fires the `onSave` callback to tell the parent screen to refresh its list, then hides itself (`onClose`).
+
+## 4. UI Grid Rendering (Lines 82-102)
+```tsx
+    const renderCategoryItem = ({ item }: { item: Category }) => (
+        <TouchableOpacity
+            // ...
+            onPress={() => setSelectedCategory(item.id)}
+        >
+            <View style={[styles.categoryIcon, { backgroundColor: item.color + '20' }]}>
+                <Icon name={item.icon} size={24} color={item.color} />
+            </View>
+            <Text>{item.name}</Text>
+        </TouchableOpacity>
+    );
+```
+*   **Logical Flow**: A modular sub-function that acts as a blueprint to stamp out identical squares for every category. It uses the exact same `+ '20'` opacity trick for the background color seen in the Dashboard.
+
+## 5. Main Form Layout (Lines 104-178)
+```tsx
+                            <Text style={styles.label}>SMS Contains (Trigger)</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={smsName}
+                                onChangeText={setSmsName}
+                                autoCapitalize="characters"
+                                editable={!initialData} 
+                            />
+```
+*   **Syntax**: `autoCapitalize="characters"` forces the keyboard into ALL CAPS mode. `editable={!initialData}` physically locks the text box if `initialData` exists (Edit mode).
+*   **Logical Flow**:
+    1. **Constraint:** The raw SMS name (`smsName`) acts as the primary key/unique identifier for rules right now. Therefore, if the user is merely editing a rule, the system locks this box. They can change the friendly Display Name or Category, but cannot change the core trigger text.
+    2. It maps the `{categories.map(...)}` array into a flexible CSS grid to let them tap an option.

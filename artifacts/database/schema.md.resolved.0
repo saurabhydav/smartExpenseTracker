@@ -1,0 +1,75 @@
+# [src/database/schema.ts](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/database/schema.ts) - Technical Explanation
+
+This file defines the Blueprint of the local SQLite database. It dictates exactly what data structures the app stores, how they relate to each other, and constructs the raw SQL queries needed to build the database from scratch on a new device.
+
+## 1. Type Definitions (Interfaces) (Lines 4-47)
+```typescript
+export interface Category {
+  id: number;
+  name: string;
+  // ...
+  userId: number;
+}
+export interface Transaction { ... type: 'debit' | 'credit'; ... }
+export interface MerchantMapping { ... }
+export interface Subscription { ... }
+```
+*   **Syntax**: `export interface` declares TypeScript types defining the exact shape of an object. `'debit' | 'credit'` is a Union Type acting as a strict enum (you literally cannot assign the word "refund" to it without throwing an error).
+*   **Logical Flow**: These act as the contract between the App and the Database. Whenever we pass data around the app, we use these blueprints so autocomplete knows `transaction.amount` exists but `transaction.price` does not. 
+
+## 2. SQL Table Creation Scripts (Lines 49-104)
+```typescript
+export const CREATE_TABLES_SQL = [
+  `CREATE TABLE IF NOT EXISTS categories (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  icon TEXT NOT NULL DEFAULT 'tag',
+  color TEXT NOT NULL DEFAULT '#6366f1',
+  budget_limit REAL,
+  user_id INTEGER,
+  created_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(name, user_id)
+)`,
+// ... similar strings for transactions, merchant_mapping, and subscriptions
+];
+```
+*   **Syntax**: Arrays of `` `backtick text` `` containing raw SQLite commands. `IF NOT EXISTS` ensures this runs safely without clearing existing databases. `PRIMARY KEY AUTOINCREMENT` means SQLite automatically counts 1, 2, 3 internally for new rows.
+*   **Logical Flow**: These strings are executed during [initDatabase()](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/database/database.ts#21-226) when the app launches. 
+    *   **Safeguards**: `UNIQUE(name, user_id)` physically prevents the database from accidentally allowing two identical categories for the same user (e.g., throwing a hard error if you try to make two "Food" categories).
+    *   **Relationships**: `category_id INTEGER REFERENCES categories(id)` enforces a **Foreign Key** relationship logically linking a receipt to its parent category. 
+
+## 3. SQL Index Creation
+```typescript
+  `CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date)`,
+  `CREATE INDEX IF NOT EXISTS idx_transactions_category ON transactions(category_id)`,
+```
+*   **Syntax**: `CREATE INDEX` on specific columns.
+*   **Logical Flow**: Performance optimization. Without an index, if you ask "Give me May's transactions", the database must scan every single row one by one (table scan). An index creates a sorted shortcut list in memory, allowing SQLite to jump to May's subset instantly.
+
+## 4. Accounts Table Update (Lines 106-127)
+```typescript
+export interface Account { ... type: 'debit' | 'credit' | 'wallet'; ... }
+
+export const CREATE_ACCOUNTS_TABLE_SQL = `CREATE TABLE IF NOT EXISTS accounts ( ... )`;
+```
+*   **Syntax**: Similar to the above SQL structures.
+*   **Logical Flow**: A modularly added table to track specific bank/wallet balances, structured identically but isolated from the main `CREATE_TABLES_SQL` array.
+
+## 5. First-Run Default Data Seeding (Lines 129-158)
+```typescript
+export const DEFAULT_CATEGORIES: Omit<Category, 'id' | 'createdAt' | 'userId'>[] = [
+  { name: 'Food & Dining', icon: 'restaurant', color: '#ef4444', budgetLimit: null },
+  { name: 'Shopping', icon: 'shopping-cart', color: '#f97316', budgetLimit: null },
+  // ...
+];
+
+export const DEFAULT_MERCHANT_MAPPINGS: Omit<MerchantMapping, 'id' | 'userId'>[] = [
+  { smsName: 'ZOMATO', displayName: 'Zomato', categoryId: 1 },
+  // ...
+];
+```
+*   **Syntax**: `Omit<Type, 'field'>` is a TypeScript utility. We tell it: "Build an array using the [Category](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/database/schema.ts#4-13) blueprint, but strip away [id](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/screens/SignupScreen.tsx#35-54), `createdAt`, and `userId` because SQLite handles those automatically."
+*   **Logical Flow**: 
+    1. When a user creates an account, they have zero data. The app feels empty. 
+    2. To fix this, we hardcode a starter pack of common categories and automatic AI-like Name Mappings ("If SMS says 'ZOMATO', it is 100% definitely Food (Category ID 1)").
+    3. During initialization, the migration logic loops over these arrays and performs `INSERT` operations to copy them into the user's local database so they are ready out of the box.

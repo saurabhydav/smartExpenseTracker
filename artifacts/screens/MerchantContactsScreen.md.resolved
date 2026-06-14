@@ -1,0 +1,66 @@
+# [src/screens/MerchantContactsScreen.tsx](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/screens/MerchantContactsScreen.tsx) - Technical Explanation
+
+This file manages the "Rules engine" for SMS parsing. It powers a UI where users can see all their mapped names ("AMZN99 -> Amazon") or view ugly raw SMS texts that the app wants them to clarify.
+
+## 1. Complex State Structure (Lines 31-38)
+```tsx
+    const [merchants, setMerchants] = useState<MerchantContact[]>([]);
+    const [unnamedMerchants, setUnnamedMerchants] = useState<{ rawName: string; count: number; lastAmount: number }[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
+    
+    // Modal State
+    const [modalVisible, setModalVisible] = useState(false);
+    const [editingMerchant, setEditingMerchant] = useState<... | undefined>(undefined);
+```
+*   **Logical Flow**: Uses several arrays to track state. It splits the UI into Two Sections: (Array 1) `unnamedMerchants` which contain raw texts like "TXN-BBSK" that have no rule, and (Array 2) `merchants` which are established clean names like "BigBasket". The modal variables are used to summon the [AddMerchantModal](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/components/AddMerchantModal.tsx#32-179) component into view on top of the list.
+
+## 2. Deep SQL Aggregation Queries (Lines 64-105)
+```tsx
+            const [result] = await db.executeSql(`
+                SELECT 
+                    m.id, m.sms_name, m.display_name, m.category_id,
+                    COUNT(t.id) as transaction_count,
+                    COALESCE(SUM(CASE WHEN t.type = 'debit' THEN t.amount ELSE 0 END), 0) as total_spent
+                FROM merchant_mapping m
+                LEFT JOIN transactions t ON UPPER(t.merchant) = UPPER(m.display_name) AND t.user_id = ?
+                WHERE m.user_id = ?
+                GROUP BY m.id
+                ORDER BY transaction_count DESC
+            `, ...);
+```
+*   **Syntax**: `LEFT JOIN` and `SUM(CASE WHEN)` SQL math functions.
+*   **Logical Flow**: 
+    1. Grabs the "Rules/Mappings" (e.g. `Amazon`). 
+    2. Merges it sideways into the [Transactions](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/database/database.ts#337-372) database table, matching anywhere the receipt says "Amazon".
+    3. Runs a math equation over every receipt connected to that rule to calculate the lifetime "Total Spent" for that specific merchant, displaying it as a statistic in the UI card.
+
+## 3. UI Flow Control (Lines 107-130)
+```tsx
+    const handleAdd = () => {
+        setEditingMerchant(undefined);
+        setModalVisible(true);
+    };
+
+    const handleNameUnnamed = (rawName: string) => {
+        setEditingMerchant({
+            smsName: rawName,
+            displayName: rawName.charAt(0).toUpperCase() + rawName.slice(1).toLowerCase(),
+            categoryId: null,
+        });
+        setModalVisible(true);
+    };
+```
+*   **Logical Flow**: Both of these trigger the EXACT SAME physical popup modal ([AddMerchantModal](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/components/AddMerchantModal.tsx#32-179)). However, if they tap "Add Rule" from scratch, it blanks the form (`undefined`). If they tap an "Unnamed Merchant" (like `ZMT9911`), it pre-populates the popup text boxes with that string and forces capitalization (`Zmt9911` instead of blank), saving the user typing time.
+
+## 4. Multi-Data List Rendering (Lines 232-267)
+```tsx
+            <FlatList
+                data={unnamedMerchants.length > 0 ? [{ type: 'unnamed' }, ...filteredMerchants.map(m => ({ ...m, type: 'saved' }))] : filteredMerchants.map(m => ({ ...m, type: 'saved' }))}
+                renderItem={({ item }) => {
+                    if ((item as any).type === 'unnamed') {
+                        return ( <View style={styles.section}> ... loop unnamed array ... </View> );
+                    }
+                    return renderMerchant({ item: item as MerchantContact });
+                }}
+```
+*   **Logical Flow**: Very complex `FlatList` trick. It artificially injects a fake object `{ type: 'unnamed' }` into the very top of the list array. When the list goes to render this first item, it bypasses the normal card design, and instead renders an entire horizontal block containing a mini-loop of the *Warning/Unnamed* boxes. All subsequent items render as normal green merchant boxes.

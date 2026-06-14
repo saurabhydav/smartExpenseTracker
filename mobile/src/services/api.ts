@@ -51,8 +51,13 @@ export async function clearTokens(): Promise<void> {
 // Request interceptor - add auth token
 api.interceptors.request.use(
     async (config: InternalAxiosRequestConfig) => {
-        // Skip auth for public endpoints
-        if (config.url?.includes('/auth/')) {
+        // Skip auth for login, signup, and refresh endpoints.
+        // Logout (/auth/logout) requires the Authorization header.
+        const isPublicAuth = config.url?.includes('/auth/login') ||
+                             config.url?.includes('/auth/signup') ||
+                             config.url?.includes('/auth/refresh') ||
+                             config.url?.includes('/auth/google');
+        if (isPublicAuth) {
             return config;
         }
 

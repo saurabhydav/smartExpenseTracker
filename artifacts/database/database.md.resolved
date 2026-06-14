@@ -1,0 +1,103 @@
+# [src/database/database.ts](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/database/database.ts) - Technical Explanation
+
+This file contains the actual functional execution of all database logic. It sits between the App logic (Zustand) and the physical SQLite database file on the phone. It is responsible for setup, error-handling migrations, inserting data, extracting arrays, and protecting against duplicates.
+
+## 1. Setup and Global Scope (Lines 1-20)
+```typescript
+import SQLite, { SQLiteDatabase } from 'react-native-sqlite-storage';
+import { CREATE_TABLES_SQL, ... } from './schema';
+
+SQLite.enablePromise(true);
+let db: SQLiteDatabase | null = null;
+const DATABASE_NAME = 'expense_tracker.db';
+```
+*   **Syntax**: `enablePromise(true)` modernizes the older SQLite driver so we can use `async/await` instead of clunky callback chains. `let db` holds an open connection variable to the file in system memory.
+*   **Logical Flow**: Prepares the tools necessary to interface with the physical device's hard drive.
+
+## 2. Initialization and Migrations (Lines 21-225)
+```typescript
+export async function initDatabase(): Promise<void> {
+    db = await SQLite.openDatabase({ name: DATABASE_NAME, location: 'default' });
+    for (const sql of CREATE_TABLES_SQL) { await db.executeSql(sql); }
+    // ...
+```
+*   **Syntax**: `await db.executeSql()` runs a raw query and waits for success. `PRAGMA user_version` dictates the schema version history.
+*   **Logical Flow**: The most complex block in the file. Order of operations:
+    1. Open the file wrapper.
+    2. Attempt to create all missing tables if it's the first install.
+    3. **Migrations:** Look for missing structural columns (like `account_id` or `original_merchant`), usually because the developer updated the app.
+    4. **Try/Catch Probing:** Since SQLite blocks structure edits if data exists, it uses `SELECT column LIMIT 1`. If it errors, we know we have an old database and trigger an `ALTER TABLE` to fix the schema.
+    5. **Unique Constraint Migration:** Since SQLite lacks standard ALTER methods to implement uniqueness, the code brutally fixes errors by renaming the table (`categories_old`), creating a brand new perfect one, copying data (`INSERT INTO... SELECT FROM`), and deleting the old one.
+    6. **Seeding:** Finally, checks if the table is empty. If yes, it calls [seedDefaultData()](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/database/database.ts#227-247) to inject the basic categories.
+
+## 3. Creating & Avoiding Duplicates (Lines 268-335)
+```typescript
+export async function insertTransaction(transaction: ..., checkDuplicates: boolean = true) {
+    if (checkDuplicates) {
+        if (transaction.rawSms) {
+            const [existing] = await database.executeSql(
+                'SELECT id FROM transactions WHERE user_id = ? AND raw_sms = ?',
+                [transaction.userId, transaction.rawSms]
+            );
+            if (existing.rows.length > 0) return existing.rows.item(0).id;
+        }
+    }
+    // ... INSERTS the item if it didn't return early
+```
+*   **Syntax**: `?` is parameter binding. It safely inserts variables to prevent SQL Injection attacks.
+*   **Logical Flow**: The biggest hurdle in SMS extraction is receiving multiple pings for the same purchase. 
+    *   **Strong Check (`rawSms`)**: If a transaction has a raw SMS payload, we look it up exactly. If it exists in the database already, we silently abort and return the existing ID rather than duplicate it.
+    *   **Weak Check**: If it's a manual entry, we look for matching totals, dates, and names. If they all perfectly align, it assumes duplicate.
+    *   **Insertion**: Only if nothing matches does it fire the formal `INSERT INTO` command.
+
+## 4. Data Extraction - Transactions (Lines 337-371)
+```typescript
+export async function getTransactions(userId: number, limit: number = 50, ... ) {
+    let query = 'SELECT * FROM transactions WHERE user_id = ?';
+    const params: (string | number)[] = [userId];
+
+    if (startDate) { query += ' AND date >= ?'; params.push(startDate); }
+    // ...
+    query += ' ORDER BY date DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+
+    const [result] = await database.executeSql(query, params);
+    // ... iterates result.rows.item(i) to build array
+```
+*   **Syntax**: Incrementally builds a string payload (`query +=`).
+*   **Logical Flow**: This is the heart of standard Dashboard filtering. It dynamically appends SQL constraints based on what was requested. "I want user 1... AND from Jan 1st... AND limit to just 50 rows". It queries SQLite natively, translating the database matrix format into a clean JavaScript array using mapping loops.
+
+## 5. Aggregation / Math (Lines 569-600)
+```typescript
+export async function getMonthlySpending(userId: number, year: number, month: number) {
+    const [result] = await database.executeSql(
+        `SELECT SUM(amount) as total FROM transactions WHERE type = 'debit' AND date BETWEEN ? AND ?`, ... );
+    return Number(result.rows.item(0)?.total || 0);
+}
+```
+*   **Syntax**: `SUM(amount)` is native SQL hardware magic.
+*   **Logical Flow**: Instead of pulling 500 records into Javascript memory and doing math loops, it tells the C-language database engine: "Do the math for me natively, and return only the final number." This saves tremendous CPU power and RAM.
+
+## 6. Category Init and Deletion Strategy (Lines 408-460 & 626-642)
+```typescript
+export async function deleteCategory(id: number, userId: number) {
+    await database.transaction((tx) => {
+        tx.executeSql('UPDATE transactions SET category_id = NULL WHERE category_id = ? ...');
+        tx.executeSql('DELETE FROM categories WHERE id = ? ...');
+    });
+}
+```
+*   **Syntax**: `database.transaction((tx) => { ... })` creates a locked atomic transaction block. Either everything succeeds, or it all rolls back to safety if one fails. No corrupted half-states.
+*   **Logical Flow**: **Data Protection**. If you delete the "Food" category, the app cannot just blindly delete it. That would orphan 50 receipts pointing at ID 1, causing the app to crash. The code explicitly "cleans up" first: It orphans the receipts safely (setting category to `NULL`), then deletes mapping definitions, and *only then* deletes the category row itself. All safely wrapped in a Tx.
+
+## 7. Row Mappers (Lines 658-695)
+```typescript
+function mapRowToTransaction(row: any): Transaction {
+    return {
+        id: row.id,
+        amount: row.amount,
+        // ... converts snake_case to camelCase
+        categoryId: row.category_id,
+```
+*   **Syntax**: Simple object translation.
+*   **Logical Flow**: SQL uses `snake_case` (e.g., `category_id`). Javascript conventionally uses `camelCase` (`categoryId`). This factory function runs on every DB query to safely translate database schema back into strict Typescript interface variables, preventing misnamed variable crashes downstream.

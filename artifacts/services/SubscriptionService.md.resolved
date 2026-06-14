@@ -1,0 +1,62 @@
+# [src/services/SubscriptionService.ts](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/SubscriptionService.ts) - Technical Explanation
+
+This file analyzes large historical sets of transactions to detect repeating cycles, allowing the app to discover "Netflix", "Gym", or "Rent" automatically without the user having to configure them manually. 
+
+## 1. Mass Aggregation Query (Lines 20-66)
+```typescript
+export async function detectSubscriptions(userId: number): Promise<DetectedSubscription[]> {
+    const [result] = await db.executeSql(`
+    SELECT COALESCE(original_merchant, merchant) as merchant_key,
+        merchant,
+        GROUP_CONCAT(amount) as amounts,
+        GROUP_CONCAT(date) as dates,
+        COUNT(*) as count
+    FROM transactions 
+    WHERE type = 'debit' AND user_id = ? AND date >= ?
+    GROUP BY COALESCE(original_merchant, merchant)
+    HAVING COUNT(*) >= 2
+  `, [userId, startDate]);
+```
+*   **Syntax**: `GROUP_CONCAT()` is a SQLite superpower. Instead of returning 5 separate rows for Netflix, it returns 1 row for Netflix, where `amounts` is secretly a string `"199,199,199"` and `dates` is `"2024-01-01,2024-02-01,2024-03-01"`. `HAVING COUNT(*) >= 2` prevents calculating math on 1-off purchases.
+*   **Logical Flow**: Gathers the previous 6 months of data, collapses every merchant together, strings out their billing history chronologically, and feeds it one-by-one into the [detectPatternHeuristic](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/SubscriptionService.ts#68-121) scanner.
+
+## 2. Heuristic Pattern Scanner (Lines 68-120)
+```typescript
+function detectPatternHeuristic(amounts: number[], dates: string[]) {
+    // 1. Check Variance (Are the amounts perfectly similar?)
+    const avgAmount = amounts.reduce((a, b) => a + b, 0) / amounts.length;
+    const amountVariance = amounts.every(a => Math.abs(a - avgAmount) / avgAmount < 0.05);
+    if (!amountVariance) return null;
+
+    // 2. Map Interval Distances
+    const intervals: number[] = [];
+    for (let i = 1; i < dates.length; i++) {
+        const diffDays = Math.abs((new Date(dates[i]).getTime() - new Date(dates[i-1]).getTime()) / (1000 * 60 * 60 * 24));
+        intervals.push(diffDays);
+    }
+    const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+
+    // 3. Score Confidence
+    if (avgInterval >= 25 && avgInterval <= 35) {
+        frequency = 'monthly';
+        confidence = 1 - Math.abs(avgInterval - 30) / 30; // Closer to 30 = closer to 1.0 (100%)
+    } ...
+```
+*   **Logical Flow**: 
+    1. Rejects the merchant immediately if the prices fluctuate by more than 5%. (e.g., Zomato deliveries vary wildly, Netflix charges exactly 199.00 every time).
+    2. Calculates the exact number of days between the 1st ping, 2nd ping, and 3rd ping. Then averages that distance.
+    3. **The Brain**: It establishes window gates. If the average gap between hits is roughly 30 days, it labels it "Monthly". It penalizes the `confidence` score depending on how far it drifts from exactly 30 days. If the total confidence falls below 60%, it aborts the detection so it doesn't hallucinate subscriptions falsely.
+
+## 3. Storage and Costs (Lines 143-206)
+```typescript
+export async function saveSubscriptions(subscriptions: DetectedSubscription[], userId: number): Promise<void> {
+    for (const sub of subscriptions) {
+        await db.executeSql(`
+      INSERT OR REPLACE INTO subscriptions (merchant, amount, frequency, next_date, is_active ...)
+      VALUES (?, ?, ?, ?, 1, ?)
+    `, ...);
+    }
+}
+```
+*   **Syntax**: `INSERT OR REPLACE` (Upsert). If a subscription for Netflix already exists in the table, update the math. If it doesn't, insert it fresh.
+*   **Logical Flow**: Commits the findings to the specialized SQLite `subscriptions` table. Another function reads this table specifically to calculate the guaranteed `Monthly Subscription Cost` (Normalizing `Weekly` charges to `* 4.33` mathematically) so it can feed the total guaranteed fixed expenses to the Analytics engine.

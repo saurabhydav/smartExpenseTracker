@@ -65,7 +65,7 @@ export default function BudgetScreen({ navigation }: BudgetScreenProps) {
     const totalBudget = safeCategories.reduce((sum, c) => sum + (c.budgetLimit || 0), 0);
     const totalPercentage = totalBudget > 0 ? calculatePercentage(monthlyTotal, totalBudget) : 0;
 
-    const handleSaveBudget = () => {
+    const handleSaveBudget = async () => {
         if (!editingCategory || !user) return;
 
         const budget = budgetInput.trim() === '' ? null : parseFloat(budgetInput);
@@ -75,8 +75,13 @@ export default function BudgetScreen({ navigation }: BudgetScreenProps) {
             return;
         }
 
-        updateCategoryBudget(editingCategory.id, user.id, budget);
-        loadCategories();
+        try {
+            await updateCategoryBudget(editingCategory.id, user.id, budget);
+            await loadCategories();
+        } catch (error) {
+            console.error('Failed to update category budget:', error);
+            Alert.alert('Error', 'Failed to save budget limit');
+        }
         setEditingCategory(null);
         setBudgetInput('');
     };

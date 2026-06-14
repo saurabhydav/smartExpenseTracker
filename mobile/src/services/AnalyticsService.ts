@@ -25,9 +25,7 @@ export interface MonthlyComparison {
     percentageChange: number;
 }
 
-/**
- * Calculate burn rate based on recent spending
- */
+
 /**
  * Calculate burn rate based on Rolling 30-Day Average
  * Uses historical data for accuracy instead of volatile month-to-date partials
@@ -184,7 +182,7 @@ export async function generateInsights(userId: number, totalBudget?: number): Pr
     const insights: SpendingInsight[] = [];
     const burnRate = await calculateBurnRate(userId, totalBudget);
     const comparison = await getMonthlyComparison(userId);
-    const subscriptionCost = await getMonthlySubscriptionCost(); // This needs userId too? Yes, likely.
+    const subscriptionCost = await getMonthlySubscriptionCost(userId);
 
     // Budget warning
     if (burnRate.daysUntilBudgetExhausted !== null) {

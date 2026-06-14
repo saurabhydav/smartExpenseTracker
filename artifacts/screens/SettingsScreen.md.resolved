@@ -1,0 +1,57 @@
+# [src/screens/SettingsScreen.tsx](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/screens/SettingsScreen.tsx) - Technical Explanation
+
+This file bridges OS-level permissions (Files, Contacts, Google Accounts) to the UI. It provides manual overrides for background services.
+
+## 1. OS-Level Read/Write Operations (Lines 49-67)
+```tsx
+    const loadSettings = async () => {
+        // Check SMS permissions (Android only)
+        if (Platform.OS === 'android') {
+            const granted = await checkSmsPermissions();
+            setSmsPermissionGranted(granted);
+            setSmsEnabled(granted);
+        }
+
+        // Check biometric settings
+        const bioAvailable = await isBiometricAvailable();
+        const bioEnabled = await isBiometricLockEnabled();
+        
+        // Get last backup time
+        const backup = await getLastBackupTime();
+    };
+```
+*   **Logical Flow**: Unlike other screens that read from `Zustand` state memory, Settings MUST read from the phone's physical hard drive. It checks OS permission tables ([checkSmsPermissions](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/SmsHandler.ts#65-92)), physical biometry hardware capabilities ([isBiometricAvailable](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/screens/BiometricLockScreen.tsx#179-190)), and persistent storage configuration keys (`AsyncStorage`) to determine which switches to turn ON or OFF when the user looks at the page.
+
+## 2. Interactive OS Handlers (Lines 69-95)
+```tsx
+    const handleSmsToggle = async (value: boolean) => {
+        if (value) {
+            const granted = await requestSmsPermissions();
+            if (!granted) {
+                Alert.alert( 'Permission Required', '...', 
+                [{ text: 'Open Settings', onPress: () => Linking.openSettings() }] );
+            }
+        }
+    };
+```
+*   **Logical Flow**: If a user turns toggles SMS sync ON, the app fires a Native OS prompt asking for permission to read their messages. If they have permanently blocked the app in the past, it cleverly uses `Linking.openSettings()` which breaks out of React Native entirely and physically launches the Android System Settings 'App Info' screen so the user can unblock the permission manually.
+
+## 3. Mass Background Scanner Execution (Lines 305-364)
+```tsx
+    // ... Inside Scan Past Transactions Button ...
+    const messages = await getRecentSms(400); // Grabs 400 literal SMS texts
+    
+    // Process in batches of 20 to speed up SQLite
+    const BATCH_SIZE = 20;
+    for (let i = 0; i < messages.length; i += BATCH_SIZE) {
+        const batch = messages.slice(i, i + BATCH_SIZE);
+        const results = await Promise.all(batch.map(msg =>
+            processSmartSms(msg.body, msg.address, ...)
+        ));
+    }
+    await refreshAll(); // Redraw Dashboard
+```
+*   **Logical Flow**: A safety mechanism. If the app failed to run in the background for a month, the user can press a button to manually ingest their inbox. 
+    1. It fetches raw text objects from the OS native SMS inbox.
+    2. It artificially limits processing to arrays of 20 using `Promise.all()`. 
+    3. If it threw 400 requests at the database engine simultaneously, the JS Thread would seize or the SQLite database would completely lock. Batching processes them in parallel chunks safely.

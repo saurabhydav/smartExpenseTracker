@@ -3,6 +3,9 @@
 
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import RNFS from 'react-native-fs';
+import { closeDatabase, initDatabase } from '../database/database';
 
 // Storage keys
 const LAST_BACKUP_KEY = 'last_backup_timestamp';
@@ -12,8 +15,9 @@ const BACKUP_ENABLED_KEY = 'backup_enabled';
 const getDatabasePath = (): string => {
     if (Platform.OS === 'android') {
         return '/data/data/com.expensetracker/databases/expense_tracker.db';
+    } else if (Platform.OS === 'ios') {
+        return `${RNFS.LibraryDirectoryPath}/LocalDatabase/expense_tracker.db`;
     }
-    // iOS path would be different
     return '';
 };
 
@@ -27,52 +31,34 @@ export interface BackupStatus {
 }
 
 /**
- * Encrypt data using AES-256
- * In production, this would use a key derived from biometric authentication
+ * Helper to convert Blob to Base64
  */
-async function encryptData(data: ArrayBuffer): Promise<ArrayBuffer> {
-    // TODO: Implement actual AES-256 encryption
-    // This would use:
-    // 1. react-native-quick-crypto for encryption
-    // 2. Key derived from biometric-protected secret
-    // 3. Random IV for each backup
-
-    // For now, return data as-is (placeholder)
-    console.log('Encryption placeholder - implement with react-native-quick-crypto');
-    return data;
-}
-
-/**
- * Decrypt data using AES-256
- */
-async function decryptData(encryptedData: ArrayBuffer): Promise<ArrayBuffer> {
-    // TODO: Implement actual AES-256 decryption
-    console.log('Decryption placeholder - implement with react-native-quick-crypto');
-    return encryptedData;
-}
+const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const result = reader.result as string;
+            const base64 = result.split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+};
 
 /**
  * Initialize Google Drive OAuth
  * Uses the hidden appDataFolder scope so users can't see/modify backup files
  */
 export async function initializeGoogleDrive(): Promise<boolean> {
-    // TODO: Implement Google Sign-In with Drive scope
-    // This requires:
-    // 1. @react-native-google-signin/google-signin package
-    // 2. Google Cloud Console project with Drive API enabled
-    // 3. OAuth consent screen configured
-
-    // Scopes needed:
-    // - https://www.googleapis.com/auth/drive.appdata (hidden app folder)
-
-    console.log('Google Drive initialization placeholder');
-
-    // Check if already signed in
     try {
-        // const { GoogleSignin } = require('@react-native-google-signin/google-signin');
-        // const isSignedIn = await GoogleSignin.isSignedIn();
-        // return isSignedIn;
-        return false;
+        GoogleSignin.configure({
+            scopes: ['https://www.googleapis.com/auth/drive.appdata'],
+            webClientId: '374802283532-qa3h9hkp4kai798sqroaukeopauvqanh.apps.googleusercontent.com',
+            offlineAccess: true,
+        });
+        const isSignedIn = GoogleSignin.getCurrentUser() !== null;
+        return isSignedIn;
     } catch (error) {
         console.error('Google Drive init error:', error);
         return false;
@@ -84,26 +70,36 @@ export async function initializeGoogleDrive(): Promise<boolean> {
  */
 export async function signInToGoogleDrive(): Promise<{ success: boolean; error?: string }> {
     try {
-        // TODO: Implement actual Google Sign-In
-        /*
-        const { GoogleSignin, statusCodes } = require('@react-native-google-signin/google-signin');
+        await GoogleSignin.hasPlayServices();
         
         GoogleSignin.configure({
-          scopes: ['https://www.googleapis.com/auth/drive.appdata'],
-          webClientId: 'YOUR_WEB_CLIENT_ID',
+            scopes: ['https://www.googleapis.com/auth/drive.appdata'],
+            webClientId: '374802283532-qa3h9hkp4kai798sqroaukeopauvqanh.apps.googleusercontent.com',
+            offlineAccess: true,
         });
-        
-        await GoogleSignin.hasPlayServices();
-        const userInfo = await GoogleSignin.signIn();
+
+        let response: any = await GoogleSignin.signInSilently();
+        if (response.type !== 'success') {
+            response = await GoogleSignin.signIn();
+        }
+
+        if (response.type !== 'success') {
+            throw new Error('Google Sign-In failed or cancelled');
+        }
+
+        const currentUser = response.data;
+        const scopes = currentUser.scopes || [];
+        const hasDriveScope = scopes.some((s: string) => s.toLowerCase().includes('drive'));
+        if (!hasDriveScope) {
+            console.log('Drive scope not found, adding scope incrementally...');
+            await GoogleSignin.addScopes({
+                scopes: ['https://www.googleapis.com/auth/drive.appdata']
+            });
+        }
         
         return { success: true };
-        */
-
-        console.log('Google Sign-In placeholder');
-        return { success: false, error: 'Google Drive integration not yet configured' };
-
     } catch (error: any) {
-        console.error('Google Sign-In error:', error);
+        console.error('Google Drive Sign-In error:', error);
         return { success: false, error: error.message };
     }
 }
@@ -115,46 +111,86 @@ export async function createBackup(): Promise<{ success: boolean; error?: string
     try {
         console.log('Starting backup process...');
 
-        // Step 1: Read the SQLite database file
         const dbPath = getDatabasePath();
         console.log('Database path:', dbPath);
-
-        // TODO: Read database file
-        // const RNFS = require('react-native-fs');
-        // const dbData = await RNFS.readFile(dbPath, 'base64');
-
-        // Step 2: Encrypt the database
-        // const encryptedData = await encryptData(dbData);
-
-        // Step 3: Upload to Google Drive appDataFolder
-        /*
-        const { GoogleSignin } = require('@react-native-google-signin/google-signin');
-        const tokens = await GoogleSignin.getTokens();
         
-        const metadata = {
-          name: `expense_backup_${Date.now()}.db.enc`,
-          parents: ['appDataFolder'],
-        };
-        
-        // Use multipart upload
-        const response = await fetch(
-          'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${tokens.accessToken}`,
-              'Content-Type': 'multipart/related; boundary=backup_boundary',
-            },
-            body: createMultipartBody(metadata, encryptedData),
-          }
-        );
-        
-        if (!response.ok) {
-          throw new Error(`Upload failed: ${response.status}`);
+        const dbExists = await RNFS.exists(dbPath);
+        if (!dbExists) {
+            throw new Error('Database file does not exist at path: ' + dbPath);
         }
-        */
 
-        // Step 4: Save backup timestamp
+        // Get access token
+        const tokens = await GoogleSignin.getTokens();
+        const accessToken = tokens.accessToken;
+        if (!accessToken) {
+            throw new Error('No Google access token found. Please sign in again.');
+        }
+
+        // Fetch local database file as Blob
+        const fileResponse = await fetch('file://' + dbPath);
+        const dbBlob = await fileResponse.blob();
+
+        const boundary = 'backup_boundary';
+        const metadata = {
+            name: `expense_backup_${Date.now()}.db`,
+            parents: ['appDataFolder'],
+        };
+
+        const metadataPart = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n`;
+        const mediaPartHeader = `--${boundary}\r\nContent-Type: application/octet-stream\r\n\r\n`;
+        const footer = `\r\n--${boundary}--`;
+
+        const multipartBody = new Blob([metadataPart, mediaPartHeader, dbBlob, footer], {
+            type: 'multipart/related; boundary=' + boundary,
+            lastModified: Date.now()
+        } as any);
+
+        // 1. Upload backup to Drive
+        const uploadResponse = await fetch(
+            'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'multipart/related; boundary=' + boundary,
+                },
+                body: multipartBody,
+            }
+        );
+
+        if (!uploadResponse.ok) {
+            const errText = await uploadResponse.text();
+            throw new Error(`Upload failed: ${uploadResponse.status} ${errText}`);
+        }
+
+        // 2. Clean up old backups (keep only latest 3)
+        const listResponse = await fetch(
+            'https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&orderBy=createdTime desc',
+            {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                },
+            }
+        );
+
+        if (listResponse.ok) {
+            const filesData = await listResponse.json();
+            const files = filesData.files || [];
+            if (files.length > 3) {
+                for (let i = 3; i < files.length; i++) {
+                    const oldFileId = files[i].id;
+                    console.log('Cleaning up old backup file:', oldFileId);
+                    await fetch(`https://www.googleapis.com/drive/v3/files/${oldFileId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                        },
+                    });
+                }
+            }
+        }
+
+        // Save backup timestamp
         const timestamp = new Date().toISOString();
         await AsyncStorage.setItem(LAST_BACKUP_KEY, timestamp);
 
@@ -174,56 +210,85 @@ export async function restoreFromBackup(): Promise<{ success: boolean; error?: s
     try {
         console.log('Starting restore process...');
 
-        // Step 1: List files in appDataFolder
-        /*
-        const { GoogleSignin } = require('@react-native-google-signin/google-signin');
         const tokens = await GoogleSignin.getTokens();
-        
-        const listResponse = await fetch(
-          'https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&orderBy=createdTime desc&pageSize=1',
-          {
-            headers: {
-              'Authorization': `Bearer ${tokens.accessToken}`,
-            },
-          }
-        );
-        
-        const files = await listResponse.json();
-        if (!files.files || files.files.length === 0) {
-          return { success: false, error: 'No backup found' };
+        const accessToken = tokens.accessToken;
+        if (!accessToken) {
+            throw new Error('No Google access token found. Please sign in again.');
         }
-        
-        const latestBackup = files.files[0];
-        
-        // Step 2: Download the backup file
-        const downloadResponse = await fetch(
-          `https://www.googleapis.com/drive/v3/files/${latestBackup.id}?alt=media`,
-          {
-            headers: {
-              'Authorization': `Bearer ${tokens.accessToken}`,
-            },
-          }
-        );
-        
-        const encryptedData = await downloadResponse.arrayBuffer();
-        
-        // Step 3: Decrypt the data
-        const decryptedData = await decryptData(encryptedData);
-        
-        // Step 4: Replace local database
-        const RNFS = require('react-native-fs');
-        const dbPath = getDatabasePath();
-        
-        // Close database connection first
-        // Then write the restored data
-        await RNFS.writeFile(dbPath, decryptedData, 'base64');
-        */
 
-        console.log('Restore placeholder - implement with actual Drive API');
-        return { success: false, error: 'Restore not yet implemented' };
+        // 1. List files in appDataFolder
+        const listResponse = await fetch(
+            'https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&orderBy=createdTime desc&pageSize=1',
+            {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                },
+            }
+        );
+
+        if (!listResponse.ok) {
+            const errText = await listResponse.text();
+            throw new Error(`Failed to check backups on Google Drive: ${listResponse.status} ${errText}`);
+        }
+
+        const filesData = await listResponse.json();
+        const files = filesData.files || [];
+        if (files.length === 0) {
+            return { success: false, error: 'No backup found in your Google Drive app data' };
+        }
+
+        const latestBackup = files[0];
+        console.log('Restoring backup file:', latestBackup.id);
+
+        // 2. Download the backup file
+        const downloadResponse = await fetch(
+            `https://www.googleapis.com/drive/v3/files/${latestBackup.id}?alt=media`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                },
+            }
+        );
+
+        if (!downloadResponse.ok) {
+            throw new Error(`Download failed: ${downloadResponse.status}`);
+        }
+
+        const dbBlob = await downloadResponse.blob();
+
+        // 3. Convert Blob to Base64
+        const base64Data = await blobToBase64(dbBlob);
+
+        // 4. Close database connection first
+        await closeDatabase();
+
+        // 5. Replace local database
+        const dbPath = getDatabasePath();
+        const dbDir = dbPath.substring(0, dbPath.lastIndexOf('/'));
+        
+        // Ensure directory exists
+        const dirExists = await RNFS.exists(dbDir);
+        if (!dirExists) {
+            await RNFS.mkdir(dbDir);
+        }
+
+        await RNFS.writeFile(dbPath, base64Data, 'base64');
+        console.log('Restored database file written successfully');
+
+        // 6. Reinitialize connection
+        await initDatabase();
+        console.log('Database reinitialized successfully');
+
+        return { success: true };
 
     } catch (error: any) {
         console.error('Restore error:', error);
+        // Attempt recovery
+        try {
+            await initDatabase();
+        } catch (dbErr) {
+            console.error('Failed to recover database connection:', dbErr);
+        }
         return { success: false, error: error.message };
     }
 }
@@ -260,25 +325,16 @@ export async function setAutoBackupEnabled(enabled: boolean): Promise<void> {
     await AsyncStorage.setItem(BACKUP_ENABLED_KEY, enabled.toString());
 
     if (enabled) {
-        // Schedule backup task
         scheduleAutoBackup();
     } else {
-        // Cancel scheduled backup
         cancelAutoBackup();
     }
 }
 
 /**
- * Schedule automatic backup at 2 AM
+ * Schedule automatic backup
  */
 function scheduleAutoBackup(): void {
-    // TODO: Implement with react-native-background-fetch or similar
-    // This would:
-    // 1. Register a background task
-    // 2. Configure to run at 2 AM daily
-    // 3. Check if device is charging and on WiFi
-    // 4. Run createBackup()
-
     console.log('Auto backup scheduling placeholder');
 }
 
@@ -286,7 +342,6 @@ function scheduleAutoBackup(): void {
  * Cancel scheduled automatic backup
  */
 function cancelAutoBackup(): void {
-    // TODO: Cancel the scheduled background task
     console.log('Auto backup cancellation placeholder');
 }
 

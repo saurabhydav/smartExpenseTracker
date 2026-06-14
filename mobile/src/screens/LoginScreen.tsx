@@ -16,6 +16,8 @@ import { authService } from '../services';
 import { useAppStore } from '../store';
 import { colors } from '../utils';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import FontAwesomeIcon from 'react-native-vector-icons/FontAwesome';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 
 interface LoginScreenProps {
     navigation: any;
@@ -26,19 +28,46 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
-    const [biometricAvailable, setBiometricAvailable] = useState(false);
-    const [biometricType, setBiometricType] = useState<string | undefined>();
 
     const { setUser, setAuthenticated } = useAppStore();
 
     useEffect(() => {
-        checkBiometricAvailability();
+        GoogleSignin.configure({
+            webClientId: '374802283532-qa3h9hkp4kai798sqroaukeopauvqanh.apps.googleusercontent.com',
+            offlineAccess: true,
+        });
     }, []);
 
-    const checkBiometricAvailability = async () => {
-        const { available, biometryType } = await authService.checkBiometricAvailability();
-        setBiometricAvailable(available);
-        setBiometricType(biometryType);
+    const handleGoogleLogin = async () => {
+        setIsLoading(true);
+        try {
+            await GoogleSignin.hasPlayServices();
+            const response = await GoogleSignin.signIn();
+            if (response.type === 'success') {
+                const idToken = response.data.idToken;
+                if (!idToken) {
+                    throw new Error('Google Sign-in failed: No ID Token received');
+                }
+                const authResult = await authService.googleLogin(idToken);
+                setUser(authResult.user);
+                setAuthenticated(true);
+            } else {
+                console.log('Google Sign-in was not completed. Status type:', response.type);
+            }
+        } catch (error: any) {
+            if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+                console.log('Google Sign-in cancelled by user');
+            } else if (error.code === statusCodes.IN_PROGRESS) {
+                Alert.alert('In Progress', 'Google Sign-in is already in progress');
+            } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+                Alert.alert('Error', 'Google Play Services not available or outdated');
+            } else {
+                const errorMessage = error.message || 'Google Sign-in failed';
+                Alert.alert('Google Sign-in Failed', errorMessage);
+            }
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleLogin = async () => {
@@ -51,53 +80,10 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
         try {
             const response = await authService.login({ email, password });
             setUser(response.user);
-
-            // Check if biometric is available and ask to enable lock
-            const { available } = await authService.checkBiometricAvailability();
-            if (available) {
-                // Import this dynamically or assume we can save it to storage
-                const { setBiometricLockEnabled } = require('./BiometricLockScreen');
-
-                Alert.alert(
-                    'Enable Biometric Lock?',
-                    'Would you like to secure the app with biometrics for future access?',
-                    [
-                        {
-                            text: 'No',
-                            onPress: () => setAuthenticated(true),
-                            style: 'cancel'
-                        },
-                        {
-                            text: 'Yes, Secure App',
-                            onPress: async () => {
-                                await setBiometricLockEnabled(true);
-                                setAuthenticated(true);
-                            }
-                        }
-                    ]
-                );
-            } else {
-                setAuthenticated(true);
-            }
+            setAuthenticated(true);
         } catch (error: any) {
             const errorMessage = error.response?.data?.message || error.message || 'Invalid email or password';
             Alert.alert('Login Failed', errorMessage);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const handleBiometricLogin = async () => {
-        setIsLoading(true);
-        try {
-            const success = await authService.authenticateWithBiometric();
-            if (success) {
-                setAuthenticated(true);
-            } else {
-                Alert.alert('Authentication Failed', 'Biometric authentication failed');
-            }
-        } catch (error) {
-            Alert.alert('Error', 'Biometric authentication failed');
         } finally {
             setIsLoading(false);
         }
@@ -158,6 +144,21 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
                     ) : (
                         <Text style={styles.loginButtonText}>Log In</Text>
                     )}
+                </TouchableOpacity>
+
+                <View style={styles.dividerContainer}>
+                    <View style={styles.dividerLine} />
+                    <Text style={styles.dividerText}>or</Text>
+                    <View style={styles.dividerLine} />
+                </View>
+
+                <TouchableOpacity
+                    style={styles.googleButton}
+                    onPress={handleGoogleLogin}
+                    disabled={isLoading}
+                >
+                    <FontAwesomeIcon name="google" size={20} color={colors.text} style={styles.googleIcon} />
+                    <Text style={styles.googleButtonText}>Continue with Google</Text>
                 </TouchableOpacity>
 
                 {/* Biometric login button removed as per user request */}
@@ -230,21 +231,6 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
     },
-    biometricButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: 52,
-        marginTop: 16,
-        borderWidth: 1,
-        borderColor: colors.primary,
-        borderRadius: 12,
-    },
-    biometricText: {
-        color: colors.primary,
-        fontSize: 16,
-        marginLeft: 8,
-    },
     footer: {
         flexDirection: 'row',
         justifyContent: 'center',
@@ -259,5 +245,39 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         marginLeft: 4,
+    },
+    dividerContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: 20,
+    },
+    dividerLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: colors.border,
+    },
+    dividerText: {
+        color: colors.textSecondary,
+        paddingHorizontal: 16,
+        fontSize: 14,
+    },
+    googleButton: {
+        flexDirection: 'row',
+        backgroundColor: colors.surface,
+        height: 52,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: colors.border,
+        marginTop: 8,
+    },
+    googleIcon: {
+        marginRight: 12,
+    },
+    googleButtonText: {
+        color: colors.text,
+        fontSize: 16,
+        fontWeight: '600',
     },
 });

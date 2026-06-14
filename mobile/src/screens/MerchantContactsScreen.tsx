@@ -11,7 +11,8 @@ import {
     TextInput,
     Alert,
 } from 'react-native';
-import { getDatabase, deleteMerchantMapping, type Category } from '../database';
+import { getDatabase, deleteMerchantMapping, getCategories, type Category } from '../database';
+import { useAppStore } from '../store';
 import { saveMerchantName, getUnnamedMerchants } from '../services/SmartSmsProcessor';
 import { colors, formatCurrency } from '../utils';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -36,7 +37,7 @@ export default function MerchantContactsScreen({ navigation }: { navigation: any
     const [modalVisible, setModalVisible] = useState(false);
     const [editingMerchant, setEditingMerchant] = useState<{ id?: number; smsName: string; displayName: string; categoryId: number | null } | undefined>(undefined);
 
-    const { user } = require('../store').useAppStore();
+    const { user } = useAppStore();
 
     useEffect(() => {
         loadData();
@@ -51,7 +52,7 @@ export default function MerchantContactsScreen({ navigation }: { navigation: any
 
     const loadCategories = async () => {
         try {
-            const { getCategories } = require('../database');
+
             const cats = await getCategories(user?.id);
             setCategories(Array.isArray(cats) ? cats : []);
         } catch (error) {
@@ -291,6 +292,9 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '600',
         color: colors.text,
+    },
+    addButton: {
+        padding: 4,
     },
     searchContainer: {
         flexDirection: 'row',

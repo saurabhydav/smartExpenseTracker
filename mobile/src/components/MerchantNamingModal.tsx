@@ -13,6 +13,7 @@ import {
     DeviceEventEmitter,
 } from 'react-native';
 import { getCategories, type Category } from '../database';
+import { useAppStore } from '../store';
 import { saveMerchantName, updateTransactionMerchant, type UnknownMerchant } from '../services/SmartSmsProcessor';
 import { colors, formatCurrency } from '../utils';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -34,7 +35,7 @@ export default function MerchantNamingModal({
     const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
     const [showCategories, setShowCategories] = useState(false);
 
-    const categories = getCategories();
+    const { categories } = useAppStore();
     // Defensive check
     const safeCategories = Array.isArray(categories) ? categories : [];
 

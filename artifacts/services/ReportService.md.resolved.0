@@ -1,0 +1,58 @@
+# [src/services/ReportService.ts](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/ReportService.ts) - Technical Explanation
+
+This file queries the database, formats the data into a giant HTML string, passes it to a native PDF generator, and hooks into the OS-level "Share" functionality (AirDrop, WhatsApp, Email).
+
+## 1. Deep Querying (Lines 19-121)
+```typescript
+export async function generateReportData(startDate: string, endDate: string): Promise<ReportData> {
+  const db = getDatabase();
+  
+  // Total spending
+  const [spendingResult] = await db.executeSql(
+    `SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE type = 'debit' AND date BETWEEN ? AND ?`, ...
+  );
+  
+  // Mapped Category Breakdowns
+  const [categoryResult] = await db.executeSql(
+    `SELECT category_id, SUM(amount) as total FROM transactions ... GROUP BY category_id ORDER BY total DESC`
+  );
+  const categoryBreakdown = [];
+  // Loop categoryResult, find the Category Name & Color, calculate Percentage of Total
+```
+*   **Logical Flow**: 
+    1. Executes 4 separate targeted SQL queries to gather: Total Income, Total Expenses, Grouped Summary by Category, and Grouped Summary by Top Merchants. 
+    2. Uses `COALESCE` to guarantee it receives a `0` instead of a crash-inducing `NULL` if no data exists.
+    3. Merges the raw math with specific Category Colors so pie charts could theoretically be built downstream. Packages everything into one massive [ReportData](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/ReportService.ts#8-18) object.
+
+## 2. Dynamic HTML Generation (Lines 123-255)
+```typescript
+export function generateReportHtml(data: ReportData): string {
+  const categoryRows = data.categoryBreakdown.map(item => `
+      <tr>
+        <td>
+          <span style="background: ${item.category.color};"></span>
+          ${item.category.name}
+        </td>
+        <td>${item.percentage}%</td>
+      </tr>
+  `).join('');
+
+  return `<!DOCTYPE html> ... ${categoryRows} ... </html>`;
+}
+```
+*   **Syntax**: Extremely heavy use of JavaScript highly-nested Template Literals (`` `text ${variable}` ``).
+*   **Logical Flow**: React Native does not render PDFs natively. The easiest way to generate a pretty document offline is to construct a literal HTML website page as a gigantic string. This function maps over the arrays, generates custom `<tr>` table rows for each category/merchant, and injects them along with inline `<style>` CSS into the main HTML skeleton block.
+
+## 3. PDF Conversion and Native Sharing (Lines 257-323)
+```typescript
+export async function shareReport(startDate: string, endDate: string): Promise<boolean> {
+    const data = await generateReportData(startDate, endDate);
+    const html = generateReportHtml(data);
+    const { PdfGenerator } = NativeModules;
+    // ...
+```
+*   **Syntax**: `NativeModules.PdfGenerator` accesses a custom Java plugin on the Android native side.
+*   **Logical Flow**:
+    1. Instructs the custom Native Java code to take the gigantic string of HTML and secretly format it into a `.pdf` file saved in the phone's internal storage (`Documents`).
+    2. Takes the resulting `file://` hard drive path and hands it to React Native's standard `Share.share()` module, triggering the OS drawer wrapper (WhatsApp, Email, etc.).
+    3. **Graceful Degradation**: If the `PdfGenerator` native module is missing or crashes, the code has a massive `try/catch` fallback block. It abandons the PDF and dynamically rewrites the entire report into plain text with emojis using `.join('\n')`, sharing it as a standard SMS format instead.

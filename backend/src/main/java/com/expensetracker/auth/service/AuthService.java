@@ -6,13 +6,19 @@ import com.expensetracker.auth.dto.SignupRequest;
 import com.expensetracker.auth.model.User;
 import com.expensetracker.auth.repository.UserRepository;
 import com.expensetracker.kafka.UserLifecycleProducer;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 
 @Service
 @SuppressWarnings("null")
@@ -24,13 +30,16 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final UserLifecycleProducer userLifecycleProducer;
+    private final String googleClientId;
 
     public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
-            JwtService jwtService, UserLifecycleProducer userLifecycleProducer) {
+            JwtService jwtService, UserLifecycleProducer userLifecycleProducer,
+            @Value("${google.client-id}") String googleClientId) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.userLifecycleProducer = userLifecycleProducer;
+        this.googleClientId = googleClientId;
     }
 
     @Transactional
@@ -126,6 +135,68 @@ public class AuthService {
             user.setRefreshToken(null);
             userRepository.save(user);
         });
+    }
+
+    @Transactional
+    public AuthResponse googleLogin(String idTokenString) {
+        log.info("Processing Google login");
+
+        try {
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), new GsonFactory())
+                    .setAudience(Collections.singletonList(googleClientId))
+                    .build();
+
+            GoogleIdToken idToken = verifier.verify(idTokenString);
+            if (idToken == null) {
+                log.warn("Invalid Google ID token");
+                throw new RuntimeException("Invalid Google ID token");
+            }
+
+            GoogleIdToken.Payload payload = idToken.getPayload();
+            String email = payload.getEmail();
+            boolean emailVerified = Boolean.TRUE.equals(payload.getEmailVerified());
+
+            if (!emailVerified) {
+                log.warn("Google email not verified: {}", email);
+                throw new RuntimeException("Google email not verified");
+            }
+
+            String name = (String) payload.get("name");
+            log.info("Google login successful for email: {}, name: {}", email, name);
+
+            // Find or create user
+            User user = userRepository.findByEmail(email)
+                    .orElseGet(() -> {
+                        log.info("Creating new user for Google login: {}", email);
+                        User newUser = User.builder()
+                                .email(email)
+                                .name(name != null ? name : email.split("@")[0])
+                                .passwordHash("") // No password for Google users
+                                .build();
+                        User saved = userRepository.save(newUser);
+                        userLifecycleProducer.sendUserCreatedEvent(saved.getId(), saved.getEmail());
+                        return saved;
+                    });
+
+            // Update last login
+            user.setLastLoginAt(LocalDateTime.now());
+
+            // Generate new tokens
+            String accessToken = jwtService.generateAccessToken(user.getId(), user.getEmail());
+            String refreshToken = jwtService.generateRefreshToken(user.getId(), user.getEmail());
+
+            user.setRefreshToken(refreshToken);
+            userRepository.save(user);
+
+            // Publish login event
+            userLifecycleProducer.sendUserLoginEvent(user.getId(), user.getEmail());
+
+            return buildAuthResponse(user, accessToken, refreshToken);
+
+        } catch (Exception e) {
+            log.error("Error verifying Google ID token", e);
+            throw new RuntimeException("Google authentication failed: " + e.getMessage(), e);
+        }
     }
 
     private AuthResponse buildAuthResponse(User user, String accessToken, String refreshToken) {

@@ -13,8 +13,8 @@ import {
     Platform,
 } from 'react-native';
 import { useAppStore } from '../store';
-import { insertTransaction, getCategories, type Category } from '../database';
-import { colors, formatCurrency } from '../utils';
+import { insertTransaction, getCategories } from '../database';
+import { colors } from '../utils';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
 interface AddTransactionScreenProps {
@@ -30,8 +30,7 @@ export default function AddTransactionScreen({ navigation }: AddTransactionScree
     const [notes, setNotes] = useState('');
     const [showCategories, setShowCategories] = useState(false);
 
-    const { refreshAll, user } = useAppStore();
-    const categories = getCategories();
+    const { refreshAll, user, categories } = useAppStore();
     const safeCategories = Array.isArray(categories) ? categories : [];
 
     const handleSave = async () => {
@@ -63,6 +62,7 @@ export default function AddTransactionScreen({ navigation }: AddTransactionScree
                 date,
                 rawSms: null,
                 notes: notes.trim() || null,
+                originalMerchant: null,
             }, false); // Allow duplicates for manual entries
 
             await refreshAll();

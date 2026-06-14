@@ -1,0 +1,54 @@
+# [src/screens/BiometricLockScreen.tsx](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/screens/BiometricLockScreen.tsx) - Technical Explanation
+
+This file acts as a mandatory security gatehouse. If the user turns on the "App Lock" setting, this screen appears instantly whenever the app opens, blocking all access until a physical fingerprint or FaceID scan occurs.
+
+## 1. Native API & Hardware Bindings (Lines 14-60)
+```tsx
+import ReactNativeBiometrics, { BiometryTypes } from 'react-native-biometrics';
+
+const checkBiometrics = async () => {
+    const { available, biometryType } = await rnBiometrics.isSensorAvailable();
+
+    if (available) {
+        setBiometryType(biometryType || 'Biometrics');
+        setTimeout(() => authenticate(), 300); // Auto-prompt on load
+    } else {
+        // ... No biometrics - allow entry (fallback)
+    }
+};
+```
+*   **Syntax**: `ReactNativeBiometrics` reaches underneath the Javascript layer directly into the iOS Secure Enclave or the Android Keystore system.
+*   **Logical Flow**: The moment the screen physically loads onto the display (`useEffect`), it queries the phone's hardware. If it detects a face scanner or fingerprint reader, it forces an immediate 300ms auto-prompt to scan the user without making them tap any buttons manually.
+
+## 2. Hardware Authentication Flow (Lines 62-92)
+```tsx
+    const authenticate = async () => {
+        setIsAuthenticating(true);
+        try {
+            const { success } = await rnBiometrics.simplePrompt({
+                promptMessage: 'Unlock Expense Tracker',
+            });
+
+            if (success) {
+                await AsyncStorage.setItem(LAST_UNLOCK_KEY, Date.now().toString());
+                onUnlock();
+            }
+        } catch (error: any) {
+            if (error?.message?.includes('cancelled')) return;
+        }
+    };
+```
+*   **Logical Flow**: 
+    1. Triggers the OS-level biometric popup ("Unlock Expense Tracker").
+    2. If the scanner passes the biological check, it writes a timestamp to the device hard drive so the app remembers *when* it was unlocked.
+    3. It fires the `onUnlock()` callback function. This function was passed down from the master Root Navigation file ([App.tsx](file:///c:/Users/HP/Downloads/expensetracker/mobile/App.tsx)), which physically deletes this Lock overlay and reveals the Dashboard underneath it.
+
+## 3. UI and OS-Level Handlers (Lines 36-39 & 94-114)
+```tsx
+    useEffect(() => {
+        // Prevent back button from closing app
+        const backHandler = BackHandler.addEventListener('hardwareBackPress', () => true);
+        return () => backHandler.remove();
+    }, []);
+```
+*   **Logical Flow (Security Layer)**: On Android devices, users have a physical "Back" triangle button on their navigation bar. It intercepts that button press and returns `true` (meaning "I handled this event"). This intercepts the system and prevents the user from pressing "Back" to bypass the lock screen.

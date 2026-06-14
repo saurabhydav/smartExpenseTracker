@@ -1,0 +1,94 @@
+# [src/components/MerchantNamingModal.tsx](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/components/MerchantNamingModal.tsx) - Technical Explanation
+
+This file acts like adding a new contact on your phone. If the app detects a background SMS expense from an unrecognized source (e.g., `"TXN*AMZN99"`), it pops this modal up on the screen, asking the user to give it a human-friendly name (`"Amazon"`) and a default category.
+
+## 1. Props and Data Setup (Lines 1-46)
+```tsx
+interface MerchantNamingModalProps {
+    visible: boolean;
+    merchant: UnknownMerchant | null;
+    onComplete: () => void;
+    onSkip: () => void;
+}
+//...
+    useEffect(() => {
+        if (merchant) {
+            setName(merchant.suggestedName);
+            setSelectedCategory(merchant.categoryId);
+        }
+    }, [merchant]);
+```
+*   **Logical Flow**: The [UnknownMerchant](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/SmartSmsProcessor.ts#24-31) object contains the raw ugly SMS string and optionally a hint/suggestion from the parser.
+    1. When the modal opens, it auto-fills the text box with the `suggestedName` provided by the AI parser so the user has less typing to do.
+
+## 2. Handling the Save (Lines 48-85)
+```tsx
+    const handleSave = async () => {
+        const displayName = name.trim() || merchant.suggestedName;
+        const { user, refreshAll } = require('../store/useAppStore').useAppStore.getState();
+        // ...
+        await saveMerchantName(merchant.rawName, displayName, selectedCategory, user.id);
+
+        if (merchant.transactionId === -1) {
+            const { updateAllTransactionsForMerchant } = require('../services/SmartSmsProcessor');
+            await updateAllTransactionsForMerchant(merchant.rawName, displayName, selectedCategory);
+        } else {
+            await updateTransactionMerchant(merchant.transactionId, displayName, selectedCategory);
+        }
+
+        await refreshAll();
+        DeviceEventEmitter.emit('TRANSACTION_UPDATED');
+        // ...
+    };
+```
+*   **Syntax**: `require(...).getState()` is a trick to read the global Zustand state from *outside* a standard React Hook context, preventing potential React render loops depending on how the modal was summoned.
+*   **Logical Flow**: Massive multi-step execution block:
+    1. Grabs the final Display Name they typed.
+    2. **Saves the Rule**: Tells the database to permanently link `TXN*AMZN` to `Amazon`.
+    3. **Retroactive Update**: `transactionId === -1` is a special flag meaning "We found multiple old transactions with this weird name." It triggers a batch SQL `UPDATE` to fix all past history retroactively. Otherwise, it just fixes the single targeted receipt.
+    4. **Emit Event**: It yells `'TRANSACTION_UPDATED'` onto the system radio frequency so any open screens instantly drop their caches and re-query SQLite.
+
+## 3. UI Display Block (Lines 105-134)
+```tsx
+                    <View style={styles.header}>
+                        <Icon name="storefront" size={32} color={colors.primary} />
+                        <Text style={styles.title}>New Merchant Detected</Text>
+                        <Text style={styles.subtitle}>Save a name for "{merchant.rawName}" ... </Text>
+                    </View>
+
+                    <View style={styles.transactionPreview}>
+                        <Text style={styles.amount}>{formatCurrency(merchant.amount)}</Text>
+                        <Text style={styles.rawName}>From: {merchant.rawName}</Text>
+                    </View>
+```
+*   **Logical Flow**: Renders a warning card. It explicitly prints the exact `merchant.rawName` (the ugly SMS text) so the user understands *why* they are being asked to clarify this.
+
+## 4. Category Dropdown (Lines 136-177)
+```tsx
+                        <TouchableOpacity style={styles.categorySelector} onPress={() => setShowCategories(!showCategories)}>
+                            {selectedCategoryData ? (
+                                <View style={styles.selectedCategory}>
+                                    <View style={[styles.categoryDot, { backgroundColor: selectedCategoryData.color }]} />
+                                    <Text style={styles.categoryText}>{selectedCategoryData.name}</Text>
+                                </View>
+                            ) : (
+                                <Text style={styles.placeholderText}>Select category</Text>
+                            )}
+                            <Icon name={showCategories ? 'expand-less' : 'expand-more'} ... />
+                        </TouchableOpacity>
+```
+*   **Syntax**: Conditional rendering `? :`
+*   **Logical Flow**: Exact same custom dropdown mechanic used in the [TransactionDetailScreen](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/screens/TransactionDetailScreen.tsx#28-260). If an item is selected, draw its color dot and name. If not, draw the placeholder text. Tapping opens a nested `ScrollView` of options.
+
+## 5. Skip Logic (Lines 187-196)
+```tsx
+                    <View style={styles.actions}>
+                        <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
+                            <Text style={styles.skipButtonText}>Skip</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+                            <Text style={styles.saveButtonText}>Save</Text>
+                        </TouchableOpacity>
+                    </View>
+```
+*   **Logical Flow**: If the user doesn't care to name this unknown merchant, they hit "Skip". It hides the modal and leaves the transaction looking ugly (raw SMS name) in the database.

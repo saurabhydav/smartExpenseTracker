@@ -114,7 +114,7 @@ export async function initDatabase(): Promise<void> {
 
         if (!tableSql.includes('UNIQUE(name, user_id)')) {
             console.log('Migrating: Recreating categories table for UNIQUE(name, user_id) constraint');
-            await db.transaction(async (tx) => {
+            await db.transaction(async (tx: any) => {
                 // 1. Rename old table
                 await tx.executeSql('ALTER TABLE categories RENAME TO categories_old');
 
@@ -138,7 +138,7 @@ export async function initDatabase(): Promise<void> {
 
         if (!mapTableSql.includes('UNIQUE(sms_name, user_id)')) {
             console.log('Migrating: Recreating merchant_mapping table for UNIQUE constraint');
-            await db.transaction(async (tx) => {
+            await db.transaction(async (tx: any) => {
                 await tx.executeSql('ALTER TABLE merchant_mapping RENAME TO merchant_mapping_old');
 
                 // Recreate (definition from schema.ts - index 2)
@@ -161,7 +161,7 @@ export async function initDatabase(): Promise<void> {
 
         if (!accTableSql.includes('UNIQUE(bank_name, last_4, user_id)')) {
             console.log('Migrating: Recreating accounts table for UNIQUE(bank_name, last_4, user_id) constraint');
-            await db.transaction(async (tx) => {
+            await db.transaction(async (tx: any) => {
                 await tx.executeSql('ALTER TABLE accounts RENAME TO accounts_old');
 
                 const { CREATE_ACCOUNTS_TABLE_SQL } = require('./schema');
@@ -182,7 +182,7 @@ export async function initDatabase(): Promise<void> {
 
         if (!subTableSql.includes('UNIQUE(merchant, user_id)')) {
             console.log('Migrating: Recreating subscriptions table for UNIQUE constraint');
-            await db.transaction(async (tx) => {
+            await db.transaction(async (tx: any) => {
                 await tx.executeSql('ALTER TABLE subscriptions RENAME TO subscriptions_old');
 
                 // Recreate (definition from schema.ts - index 3)
@@ -626,7 +626,7 @@ export async function getDailySpending(userId: number, year: number, month: numb
 export async function deleteCategory(id: number, userId: number): Promise<void> {
     const database = getDatabase();
     try {
-        await database.transaction((tx) => {
+        await database.transaction((tx: any) => {
             // 1. Unlink transactions (ensure they belong to user)
             tx.executeSql('UPDATE transactions SET category_id = NULL WHERE category_id = ? AND user_id = ?', [id, userId]);
             // 2. Unlink merchant mappings (ensure they belong to user)

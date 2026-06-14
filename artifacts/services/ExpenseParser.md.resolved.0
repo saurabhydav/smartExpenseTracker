@@ -1,0 +1,61 @@
+# [src/services/ExpenseParser.ts](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/ExpenseParser.ts) - Technical Explanation
+
+This file is a localized Regex Engine. It reads raw SMS notifications ("You spent Rs.500 at SWIGGY") and uses pattern matching heuristics to slice out the exact price, date, merchant, and bank account.
+
+## 1. Constants & Setup (Lines 15-54)
+```typescript
+const COMMON_MERCHANTS: { [key: string]: string } = {
+    'ZOMATO': 'Zomato', 'SWIGGY': 'Swiggy', 'UBER': 'Uber', // ...
+};
+
+const ACCOUNT_PATTERNS = [
+    /(?:A\/c|Acct|Account)\s+(?:no\.|ending)?\s*[:\-\s]?\s*(?:[X*]+)(\d{3,4})/i,
+    // ...
+];
+```
+*   **Logical Flow**: Contains a hardcoded dictionary (`COMMON_MERCHANTS`) to instantly map generic brand text into pretty labels. Contains complex Regex strings (`ACCOUNT_PATTERNS`) designed to hunt for patterns like "A/c ending in **1234" across hundreds of different bank formats.
+
+## 2. Text Slicing Utilites (Lines 56-106)
+```typescript
+function getTransactionType(smsOrType: string): 'debit' | 'credit' {
+    const lower = smsOrType.toLowerCase();
+    
+    if (smsOrType.includes('Dr.') && smsOrType.includes('Cr.')) return 'debit';
+    if (lower.match(/\b(credited|received|deposited|added\s+to|refund|inward|reversal)\b/)) return 'credit';
+    // ... defaults to debit
+}
+```
+*   **Logical Flow**: Analyzes verbs. If an SMS says "credited", it's income. It specifically handles rare edge cases where a single text contains both "Dr." and "Cr." (usually meaning money walked *out* of your account into someone else's, so it correctly defaults to an expense).
+
+## 3. The Core Regex Engine (Lines 166-216)
+```typescript
+export function parseExpenseWithRegex(rawSms: string, isKnownBank: boolean = false, smsTimestamp?: number): ParsedExpense | null {
+    const sms = rawSms.normalize('NFKC');
+```
+*   **Syntax**: `.normalize('NFKC')` is a Unicode sanitizer. Sometimes banks send weird stylized fonts like `"𝖽𝖾𝖻𝗂𝗍𝖾𝖽"`. This rigidly forces them back into standard ASCII `"debited"` so the Regex engine doesn't break.
+*   **Logical Flow**:
+    1. **Initial Filter**: Checks basic math rules (must have numbers, must have a verb like "spent").
+    2. **Account Parsing**: Asks the `ACCOUNT_PATTERNS` regex to find the last 4 digits. If it fails, and the sender isn't a known bank, it aborts (`return null`) assuming it's a spam text.
+    3. **Amount Parsing**: Hunts for `Rs.` or `INR` followed by numbers and decimals.
+    4. **Name Parsing**: Hunts for UPI IDs (`@bankname`), or uses keywords (`via`, [at](file:///c:/Users/HP/Downloads/expensetracker/backend/run_local.bat), [to](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/BackupService.ts#285-292)) to try and isolate the word right after them. "spent 500 at SWIGGY" -> strips everything except "SWIGGY".
+
+## 4. Name Cleaning & Categorization (Lines 108-148 & 234-267)
+```typescript
+function cleanMerchantName(raw: string): string {
+    // ...
+    name = name.replace(/^(VPS|IPS|REV|UPI|IMPS|NEFT|RTGS)[\/-]?/i, '')
+               .replace(/\d{6,}/, '')
+    // ...
+}
+```
+*   **Logical Flow**: If the bank says `UPI/REV/ZOMATO/9128384`, this regex rips out the "UPI" and the long random numbers, leaving just "ZOMATO".
+
+```typescript
+export async function autoCategorizeMerchant(merchantName: string, userId: number): Promise<number | null> {
+    const categoryKeywords: { ... } = {
+        'Food & Dining': ['zomato', 'swiggy', 'dominos', 'pizza', 'restaurant', ...],
+        'Transportation': ['uber', 'ola', 'rapido', 'petrol', 'fuel', ...],
+        // ...
+    };
+```
+*   **Logical Flow**: If the system detects a brand new merchant not in your database, it loops through a giant dictionary of keywords. If it spots "petrol" in the name, it automatically creates the relationship linking it to the strict ID of "Transportation".

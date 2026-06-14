@@ -16,10 +16,7 @@ export interface DetectedSubscription {
  * Analyze transactions to detect subscription patterns
  * Runs as a 24-hour background task
  */
-/**
- * Analyze transactions to detect subscription patterns
- * Runs as a 24-hour background task
- */
+
 export async function detectSubscriptions(userId: number): Promise<DetectedSubscription[]> {
     const db = getDatabase();
     const subscriptions: DetectedSubscription[] = [];
@@ -83,11 +80,14 @@ function detectPatternHeuristic(
 
     if (!amountVariance) return null;
 
+    // Sort dates chronologically to ensure accurate interval calculation
+    const sortedDates = [...dates].sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+
     // Calculate intervals between dates
     const intervals: number[] = [];
-    for (let i = 1; i < dates.length; i++) {
-        const d1 = new Date(dates[i - 1]);
-        const d2 = new Date(dates[i]);
+    for (let i = 1; i < sortedDates.length; i++) {
+        const d1 = new Date(sortedDates[i - 1]);
+        const d2 = new Date(sortedDates[i]);
         const diffDays = Math.abs((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
         intervals.push(diffDays);
     }
@@ -118,7 +118,7 @@ function detectPatternHeuristic(
         amount: avgAmount,
         frequency,
         confidence,
-        nextDate: calculateNextDate(dates[dates.length - 1], frequency),
+        nextDate: calculateNextDate(sortedDates[sortedDates.length - 1], frequency),
     };
 }
 

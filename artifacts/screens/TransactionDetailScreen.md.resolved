@@ -1,0 +1,125 @@
+# [src/screens/TransactionDetailScreen.tsx](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/screens/TransactionDetailScreen.tsx) - Technical Explanation
+
+This screen shows the detailed view of a single transaction. Crucially, it allows the user to **edit the category**, toggle SMS auto-categorization learning, or delete the transaction entirely.
+
+## 1. Imports and Parameter Extraction (Lines 1-32)
+```tsx
+import { ... } from 'react-native';
+import { updateTransaction, getCategoryById, deleteTransaction } from '../database';
+import { saveMerchantName, updateAllTransactionsForMerchant } from '../services/SmartSmsProcessor';
+
+export default function TransactionDetailScreen({ navigation, route }: TransactionDetailScreenProps) {
+    const { id } = route.params;
+    const { categories, user, refreshAll, transactions } = useAppStore();
+```
+*   **Syntax**: `route.params` extracts variables passed from the previous screen.
+*   **Logical Flow**: When you tapped "Uber" in the dashboard, the navigation system passed `{ id: 5 }`. This file extracts `id=5` so it knows which specific database row to display.
+
+## 2. Setting Up State (Lines 33-37)
+```tsx
+    const [transaction, setTransaction] = useState<Transaction | null>(null);
+    const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+    const [showCategories, setShowCategories] = useState(false);
+    const [autoCategorizeFuture, setAutoCategorizeFuture] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+```
+*   **Logical Flow**: State variables track: 
+    *   The raw transaction data.
+    *   Which category bubble the user currently has highlighted.
+    *   Whether the dropdown list of categories is visible.
+    *   Toggle setting for the Smart SMS learner ("autoCategorizeFuture").
+    *   Loading state (`isSaving`) to disable buttons while the database works.
+
+## 3. Loading Initial Data (Lines 39-55)
+```tsx
+    useEffect(() => { loadTransaction(); }, [id, transactions]);
+
+    const loadTransaction = () => {
+        const found = transactions.find(t => t.id === id);
+        if (found) {
+            setTransaction(found);
+            setSelectedCategory(found.categoryId);
+        } else {
+            navigation.goBack(); // Emergency fallback
+        }
+    };
+```
+*   **Syntax**: `useEffect` runs when [id](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/screens/SignupScreen.tsx#35-54) or `transactions` change.
+*   **Logical Flow**: Instead of doing a heavy SQLite query, it just scans the array already loaded in the global App Store. It instantly populates the UI and sets the `selectedCategory` to whatever it currently is.
+
+## 4. The Save/Update Engine (Lines 57-96)
+```tsx
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            await updateTransaction(transaction.id, user.id, { categoryId: selectedCategory });
+
+            if (transaction.rawSms && autoCategorizeFuture) {
+                const parsed = await parseExpense(transaction.rawSms);
+                if (parsed && parsed.merchant) {
+                    await saveMerchantName(parsed.merchant, transaction.merchant, selectedCategory, user.id);
+                }
+            }
+
+            refreshAll();
+            navigation.goBack();
+        } catch (error) { ... }
+    };
+```
+*   **Syntax**: `try / catch / finally` structure to ensure the app doesn't crash on SQL errors, and guarantees `setIsSaving(false)` runs no matter what.
+*   **Logical Flow**:
+    1. Writes the new Category ID to the SQL database using [updateTransaction](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/database/database.ts#381-398).
+    2. **Smart Learning Logic**: If this was an automated SMS transaction AND the toggle switch is ON: It rips the raw, ugly SMS text (e.g., "TXN*ZOMATO"), re-parses it, and saves a hard rule in the database mapping: `"ZOMATO" -> Food`.
+    3. Calls [refreshAll()](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/store/useAppStore.ts#146-157) so the Dashboard updates its pie charts, and reverses the navigation to go back.
+
+## 5. Main UI Render: Keyboard Protection & Details (Lines 103-144)
+```tsx
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+            <ScrollView>
+                 { /* Header, Amount Card, Merchant blocks */ }
+                 <Text style={[styles.amount, { color: transaction.type === 'debit' ? colors.debit : colors.credit }]}>
+                     {transaction.type === 'debit' ? '-' : '+'}{formatCurrency(transaction.amount)}
+                 </Text>
+```
+*   **Syntax**: `<KeyboardAvoidingView>` is a wrapper that pushes the screen up if the on-screen keyboard appears (so it doesn't cover input fields). `Platform.OS` checks if it's an iPhone or Android to apply different physics logic.
+*   **Logical Flow**: Standard display layout showing the big numbers, colored dynamically using the same logic as the dashboard.
+
+## 6. Category Dropdown Editor (Lines 145-183)
+```tsx
+                    <TouchableOpacity onPress={() => setShowCategories(!showCategories)}>
+                        <Text>{category?.name || 'Uncategorized'}</Text>
+                        <Icon name={showCategories ? "expand-less" : "expand-more"} />
+                    </TouchableOpacity>
+
+                    {showCategories && (
+                        <View style={styles.categoryList}>
+                            {safeCategories.map((cat) => (
+                                <TouchableOpacity onPress={() => { setSelectedCategory(cat.id); setShowCategories(false); }}>
+                                    <Text>{cat.name}</Text>
+                                    {selectedCategory === cat.id && <Icon name="check" />}
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    )}
+```
+*   **Syntax**: `{showCategories && (...) }` conditionally renders the dropdown box only if the boolean is true.
+*   **Logical Flow**: 
+    1. Clicking the main button flips `showCategories` true/false, simulating a dropdown.
+    2. The dropdown maps over every allowed category.
+    3. Clicking an option sets the `selectedCategory` state, automatically places a checkmark next to it, and snaps the dropdown shut.
+
+## 7. The Delete Mechanism (Lines 221-253)
+```tsx
+                <TouchableOpacity onPress={() => {
+                        Alert.alert('Delete', 'Are you sure?', [
+                                { text: 'Cancel', style: 'cancel' },
+                                { text: 'Delete', style: 'destructive', onPress: async () => {
+                                        await deleteTransaction(transaction.id, user.id);
+                                        refreshAll();
+                                        navigation.goBack();
+                                }}
+                        ]);
+                 }}>
+```
+*   **Syntax**: `Alert.alert` launches a native OS popup.
+*   **Logical Flow**: Protects against accidental clicks. If confirmed, it calls the SQL deletion query, forces the global state to refresh, and boots the user back to the previous screen.

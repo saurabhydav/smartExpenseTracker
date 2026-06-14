@@ -1,0 +1,100 @@
+# [src/store/useAppStore.ts](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/store/useAppStore.ts) - Technical Explanation
+
+This file is the "Central Brain" (Global State Management) of the application. It uses a library called `Zustand` to store data (like transactions and user info) in memory so that any screen in the app can access and update it instantly.
+
+## 1. Imports and Type Definitions (Lines 1-43)
+```typescript
+import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+// ... Interface definitions (AuthState, ExpenseState, AppState)
+```
+*   **Syntax**: `import { create } from 'zustand'` brings in the main store creation tool. `interface AppState extends AuthState, ExpenseState` combines multiple smaller interfaces into one massive blueprint.
+*   **Logical Flow**: We define the exact "shape" of the store. The store will hold Auth data ([user](file:///c:/Users/HP/Downloads/expensetracker/backend/src/main/java/com/expensetracker/config/KafkaConfig.java#21-28), [isAuthenticated](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/AuthService.ts#31-36)), Expense data (`transactions`, `categories`), and Functions ([refreshAll](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/store/useAppStore.ts#146-157), [loadTransactions](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/store/useAppStore.ts#100-115)). This guarantees TypeScript will yell at us if we try to save invalid data.
+
+## 2. Store Creation & Persistence Hook (Lines 50-52)
+```typescript
+export const useAppStore = create<AppState>()(
+    persist(
+        (set, get) => ({
+```
+*   **Syntax**: `create<AppState>()(...)` makes a Zustand hook specifically mapped to our [AppState](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/store/useAppStore.ts#23-44) interface. `persist` is a middleware wrapper. [(set, get) => ({ ... })](file:///c:/Users/HP/Downloads/expensetracker/mobile/App.tsx#121-245) is a function that returns the actual state object. [set](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/store/useAppStore.ts#71-73) updates the store, [get](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/api.ts#35-46) reads the store.
+*   **Logical Flow**: We are building the global store. By wrapping it in `persist`, Zustand will automatically save specific variables (like the user token and currency preference) to the phone's physical hard drive (AsyncStorage) so they survive app restarts.
+
+## 3. Initial State Variables (Lines 53-69)
+```typescript
+isAuthenticated: false,
+user: null,
+transactions: [],
+selectedMonth: getCurrentMonth(),
+```
+*   **Syntax**: Key-value pairs defining the starting values.
+*   **Logical Flow**: When the app first launches, these are the defaults before any database queries happen. The `selectedMonth` defaults to whatever the current real-world month is.
+
+## 4. Auth Actions (Lines 71-98)
+```typescript
+checkAuth: async () => {
+    set({ isLoading: true });
+    try {
+        const isAuth = await authService.isAuthenticated();
+        set({ isAuthenticated: isAuth, isLoading: false });
+        // ...
+```
+*   **Syntax**: `async () => { ... }` creates an asynchronous function (does multiple things over time). `await` pauses execution until `authService` responds. [set({ ... })](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/store/useAppStore.ts#71-73) mutates the global variables.
+*   **Logical Flow**: The [checkAuth](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/store/useAppStore.ts#76-87) function asks the backend/auth service "Is this user's token valid?". It turns on a loading spinner (`isLoading: true`), waits for the answer, and then updates [isAuthenticated](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/AuthService.ts#31-36). The [logout](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/AuthService.ts#51-61) function clears everything (empties transactions and sets user to null).
+
+## 5. Data Fetching Actions (Lines 100-144)
+```typescript
+loadTransactions: async (limit = 50) => {
+    const { user, selectedMonth } = get();
+    if (!user) return; // Guard clause
+
+    try {
+        const startDate = `${selectedMonth.year}-${String(selectedMonth.month).padStart(2, '0')}-01`;
+        // ... build endDate ...
+        const transactions = await getTransactions(user.id, limit, 0, startDate, endDate);
+        set({ transactions });
+    }
+}
+```
+*   **Syntax**: [get()](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/services/api.ts#35-46) reads the current global state (to find out the `selectedMonth`). `String().padStart(2, '0')` forces numbers like `5` to become `"05"`.
+*   **Logical Flow**: 
+    1. Grabs the currently selected month and constructs exact SQLite date bounds (e.g., `2024-05-01` to `2024-05-31`).
+    2. Runs the SQLite database query ([getTransactions](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/database/database.ts#337-372)).
+    3. Overwrites the global `transactions` array with the new data using [set({ transactions })](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/store/useAppStore.ts#71-73).
+
+## 6. Global Refresher & Time Travel (Lines 146-164)
+```typescript
+refreshAll: async () => {
+    const { loadTransactions, loadCategories, loadMonthlyStats, user } = get();
+    await Promise.all([ loadCategories(), loadTransactions(), loadMonthlyStats() ]);
+},
+
+setSelectedMonth: (year, month) => {
+    set({ selectedMonth: { year, month } });
+    const { loadTransactions, loadMonthlyStats } = get();
+    loadTransactions();
+    loadMonthlyStats();
+},
+```
+*   **Syntax**: `Promise.all([ ... ])` triggers multiple asynchronous database queries to run SIMULTANEOUSLY rather than waiting for one to finish before starting the next.
+*   **Logical Flow**: 
+    *   [refreshAll](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/store/useAppStore.ts#146-157) is a convenience function to sync everything at once (triggered by Pull-To-Refresh or socket events).
+    *   [setSelectedMonth](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/store/useAppStore.ts#158-165) is called when you hit the `<` or `>` arrows on the dashboard. It changes the target month and instantly commands the store to reload its transaction and stats data to match the new month.
+
+## 7. Persist Configuration (Lines 166-175)
+```typescript
+{
+    name: 'expense-tracker-storage',
+    storage: createJSONStorage(() => AsyncStorage),
+    partialize: (state) => ({
+        user: state.user,
+        currencySymbol: state.currencySymbol,
+    }),
+}
+```
+*   **Syntax**: Configuration object passed to the `persist` middleware.
+*   **Logical Flow**: 
+    1. Names the local storage file `expense-tracker-storage`.
+    2. Uses React Native `AsyncStorage` (device hard drive) instead of LocalStorage (browser).
+    3. [partialize](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/store/useAppStore.ts#169-174) is a filter. It tells Zustand: "ONLY save [user](file:///c:/Users/HP/Downloads/expensetracker/backend/src/main/java/com/expensetracker/config/KafkaConfig.java#21-28) and `currencySymbol` to the hard drive. For everything else (like `transactions`), start completely fresh and empty every time the app opens until the database finishes loading."

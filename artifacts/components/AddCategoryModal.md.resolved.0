@@ -1,0 +1,95 @@
+# [src/components/AddCategoryModal.tsx](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/components/AddCategoryModal.tsx) - Technical Explanation
+
+This file contains the UI component for a standalone pop-up modal that allows users to create custom expense categories with custom icons and colors.
+
+## 1. Imports and Interface Definition (Lines 1-18)
+```tsx
+import React, { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, Modal, StyleSheet, ScrollView } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+// ...
+interface AddCategoryModalProps {
+    visible: boolean;
+    onClose: () => void;
+    onSave: (name: string, icon: string, color: string, budget: number | null) => void;
+}
+```
+*   **Syntax**: `interface` rigidly defines the "props" (arguments) this UI component requires from its parent screen to function.
+*   **Logical Flow**: The component does not interact with the database directly. Instead, it relies on callback functions (`onSave`, `onClose`) passed down from the parent screen. This makes the modal reusable anywhere in the app without tying it to specific SQLite code.
+
+## 2. Default Configuration Arrays (Lines 20-29)
+```tsx
+const ICONS = ['shopping-cart', 'restaurant', 'directions-car', ...];
+const COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', ...];
+```
+*   **Logical Flow**: Hardcoded arrays providing a curated list of visual options for the user. These represent the specific strings that `react-native-vector-icons` expects and predefined pleasing hex colors.
+
+## 3. State Setup and Handling (Lines 31-48)
+```tsx
+export default function AddCategoryModal({ visible, onClose, onSave }: AddCategoryModalProps) {
+    const [name, setName] = useState('');
+    const [selectedIcon, setSelectedIcon] = useState(ICONS[0]);
+    // ...
+    
+    const handleSave = () => {
+        if (!name.trim()) return;
+        onSave(name, selectedIcon, selectedColor, budget ? parseFloat(budget) : null);
+        resetForm();
+    };
+    const resetForm = () => { setName(''); ... }
+```
+*   **Syntax**: `ICONS[0]` sets the initial state to the first item ("shopping-cart") by default. `parseFloat(budget)` safely attempts to convert an empty string into a `NaN` or a valid number.
+*   **Logical Flow**: 
+    1. Tracks what the user has tapped (which color, which icon) using React state.
+    2. When Save is tapped, it validates the name isn't blank (`if (!name.trim()) return;`).
+    3. It packages the selected visual preferences and passes them UP to the parent screen via `onSave(...)`.
+    4. Automatically wipes all input boxes clean ([resetForm()](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/components/AddCategoryModal.tsx#43-49)) so it's fresh the next time it opens.
+
+## 4. Modal Render Engine (Lines 50-128)
+```tsx
+    return (
+        <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+            <View style={styles.modalOverlay}>
+                <View style={styles.modalContent}>
+                    {/* ... */}
+```
+*   **Syntax**: `<Modal>` is a specialized React Native component that physically hovers over all other app routes. 
+*   **Logical Flow**: `transparent` allows the dark, semi-transparent `modalOverlay` style to show the background screen dimly behind it. `onRequestClose` binds to the physical Android "Back" hardware button to dismiss the popup gracefully.
+
+## 5. Horizontal Selection Lists (Lines 64-97)
+```tsx
+                    <Text style={styles.label}>Select Icon</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        {ICONS.map(icon => (
+                            <TouchableOpacity
+                                key={icon}
+                                onPress={() => setSelectedIcon(icon)}
+                                style={[styles.iconItem, selectedIcon === icon && { backgroundColor: selectedColor }]}
+                            >
+                                <Icon name={icon} color={selectedIcon === icon ? '#fff' : colors.textSecondary} />
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+```
+*   **Syntax**: `<ScrollView horizontal>` turns a normal vertical list sideways.
+*   **Logical Flow**:
+    1. Iterates over the `ICONS` array.
+    2. Builds a touchable circle for each one.
+    3. **Dynamic Styling**: If `selectedIcon === icon` is TRUE, it injects an active background color (pulling from `selectedColor`) and flips the inner icon to pure white (`#fff`). Otherwise, it stays a dull gray outline. This provides instant visual feedback when tapped.
+
+## 6. Form Submission (Lines 112-124)
+```tsx
+                    <View style={styles.buttonContainer}>
+                        <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+                            <Text>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.saveButton, !name.trim() && styles.disabledButton]}
+                            onPress={handleSave}
+                            disabled={!name.trim()}
+                        >
+                            <Text>Create Category</Text>
+                        </TouchableOpacity>
+                    </View>
+```
+*   **Logical Flow**: Contains two standard buttons. The Save button is physically unclickable (`disabled={!name.trim()}`) and visually greyed out (`styles.disabledButton`) until the user types at least one character into the Name text box.

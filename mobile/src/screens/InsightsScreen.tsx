@@ -27,7 +27,7 @@ import {
     type DetectedSubscription,
 } from '../services/SubscriptionService';
 import { shareCurrentMonthReport } from '../services/ReportService';
-import { colors, formatCurrency, getMonthName } from '../utils';
+import { colors, formatCurrency } from '../utils';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
 const { width } = Dimensions.get('window');

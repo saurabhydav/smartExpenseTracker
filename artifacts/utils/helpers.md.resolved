@@ -1,0 +1,76 @@
+# [src/utils/helpers.ts](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/utils/helpers.ts) - Technical Explanation
+
+This file contains utility functions and constants used throughout the Expense Tracker app. It acts as a shared library for formatting numbers, dates, and defining visual constants (colors/icons).
+
+## 1. Global Currency Setup (Lines 1-8)
+```typescript
+// Mutable currency code (set by App.tsx from Store)
+let globalCurrencyCode = 'INR';
+
+export function setGlobalCurrency(code: string) {
+    globalCurrencyCode = code;
+}
+```
+*   **Syntax**: [let](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/screens/MerchantContactsScreen.tsx#131-153) creates a variable that can be changed. `export function` makes the function available to other files. `code: string` is TypeScript enforcing that the argument must be text.
+*   **Logical Flow**: The app stores the user's preferred currency (e.g., USD, INR) in the database. When the app loads, [App.tsx](file:///c:/Users/HP/Downloads/expensetracker/mobile/App.tsx) reads that preference and calls [setGlobalCurrency('USD')](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/utils/helpers.ts#6-9). This updates the internal `globalCurrencyCode` variable so all other helper functions know what currency to display.
+
+## 2. Currency Formatting (Lines 10-18)
+```typescript
+export function formatCurrency(amount: number, currency: string = globalCurrencyCode): string {
+    return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency,
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+    }).format(amount);
+}
+```
+*   **Syntax**: `currency: string = globalCurrencyCode` is a default parameter. If the caller doesn't provide a currency, it falls back to the global one. `new Intl.NumberFormat` invokes the browser's built-in internationalization library.
+*   **Logical Flow**: Given a raw number like `5000.5`, it converts it to a localized string like `"₹5,000.50"`. It enforces Indian numeric grouping (`en-IN` -> `1,00,000`) and limits decimals to 2 places.
+
+## 3. Date Formatting (Lines 20-36)
+```typescript
+export function formatDate(dateString: string, format: 'short' | 'long' = 'short'): string {
+    const date = new Date(dateString);
+    if (format === 'short') { ... }
+    return ...
+}
+```
+*   **Syntax**: `format: 'short' | 'long'` is a TypeScript Union Type. It strictly ensures you can only pass the exact word `"short"` or `"long"`. `new Date()` converts the string into a JavaScript Date object.
+*   **Logical Flow**: Takes a raw database date (`"2026-02-01"`) and turns it into readable text. `short` generates `"1 Feb"`. `long` generates `"1 February 2026"`.
+
+## 4. Relative Time (Lines 38-50)
+```typescript
+export function formatRelativeTime(dateString: string): string { ... }
+```
+*   **Syntax**: `Math.floor()` rounds a decimal down to the nearest whole number.
+*   **Logical Flow**: Subtracts the transaction's date from "Right Now" (`now.getTime() - date.getTime()`). It calculates the difference in milliseconds, converts it to days, and returns human-friendly words like `"Today"`, `"Yesterday"`, or `"2 weeks ago"`.
+
+## 5. Month Name Lookup (Lines 52-59)
+```typescript
+export function getMonthName(month: number): string {
+    const months = [ 'January', 'February', ... ];
+    return months[month - 1];
+}
+```
+*   **Syntax**: Array indexing `[month - 1]`. Arrays in JS are 0-indexed.
+*   **Logical Flow**: Converts a numerical month (e.g., `2`) into its string equivalent (`"February"`) by looking it up in the array. We subtract 1 because January is month 1, but sits at index 0.
+
+## 6. Percentage Calculation (Lines 61-65)
+```typescript
+export function calculatePercentage(value: number, total: number): number {
+    if (total === 0) return 0;
+    return Math.round((value / total) * 100);
+}
+```
+*   **Syntax**: `Math.round()` rounds to the nearest integer.
+*   **Logical Flow**: Prevents "Divide by Zero" crashes with the `if (total === 0)` check. Otherwise, it calculates the ratio [(amount / total)](file:///c:/Users/HP/Downloads/expensetracker/mobile/App.tsx#121-245) and converts it to a clean percentage for UI progress bars.
+
+## 7. App Constants (Lines 67-104)
+```typescript
+export const colors = { primary: '#6366f1', ... };
+export const categoryIcons: Record<string, string> = { 'Food & Dining': 'restaurant', ... };
+export function getCategoryIcon(categoryName: string): string { ... }
+```
+*   **Syntax**: `Record<string, string>` is TypeScript defining an object where both the keys and values are strings.
+*   **Logical Flow**: Centralizes visual configurations. If the developer wants to change the "primary" color or the icon mapped to "Food & Dining", they only have to change it here, and the entire app automatically updates. [getCategoryIcon](file:///c:/Users/HP/Downloads/expensetracker/mobile/src/utils/helpers.ts#100-104) uses `|| 'label'` to provide a safe fallback icon if a category name fails to match.
