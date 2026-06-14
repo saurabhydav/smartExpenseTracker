@@ -78,14 +78,25 @@ export async function signInToGoogleDrive(): Promise<{ success: boolean; error?:
             offlineAccess: true,
         });
 
-        // Clear previous session to force the Google Account picker dialog to display
-        try {
-            await GoogleSignin.signOut();
-        } catch (e) {
-            // Ignore error if not already signed in
+        // Check if already linked or logged in via Google
+        const isLinked = await AsyncStorage.getItem('GOOGLE_DRIVE_LINKED');
+        const hasSession = GoogleSignin.getCurrentUser() !== null;
+
+        let response: any;
+        if (isLinked === 'true' || hasSession) {
+            try {
+                response = await GoogleSignin.signInSilently();
+            } catch (e) {
+                console.log('Silent sign-in failed, falling back to account picker:', e);
+            }
         }
 
-        const response: any = await GoogleSignin.signIn();
+        if (!response || response.type !== 'success') {
+            response = await GoogleSignin.signIn();
+            if (response.type === 'success') {
+                await AsyncStorage.setItem('GOOGLE_DRIVE_LINKED', 'true');
+            }
+        }
 
         if (response.type !== 'success') {
             throw new Error('Google Sign-In failed or cancelled');

@@ -17,6 +17,13 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 
 const { width } = Dimensions.get('window');
 
+const getInitials = (name: string): string => {
+    if (!name) return 'U';
+    const parts = name.trim().split(' ');
+    if (parts.length === 1) return parts[0].substring(0, 1).toUpperCase();
+    return (parts[0].substring(0, 1) + parts[parts.length - 1].substring(0, 1)).toUpperCase();
+};
+
 interface DashboardScreenProps {
     navigation: any;
 }
@@ -92,8 +99,13 @@ export default function DashboardScreen({ navigation }: DashboardScreenProps) {
                     <Text style={styles.greeting}>Hello, {user?.name?.split(' ')[0] || 'User'}</Text>
                     <Text style={styles.subtitle}>Here's your expense summary</Text>
                 </View>
-                <TouchableOpacity style={styles.profileButton}>
-                    <Icon name="person" size={24} color={colors.text} />
+                <TouchableOpacity 
+                    style={styles.profileButton}
+                    onPress={() => navigation.navigate('Settings')}
+                >
+                    <Text style={styles.profileButtonText}>
+                        {getInitials(user?.name || 'User')}
+                    </Text>
                 </TouchableOpacity>
             </View>
 
@@ -232,12 +244,19 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     profileButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: colors.surface,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: colors.primary + '15', // light primary tint
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 1.5,
+        borderColor: colors.primary,
+    },
+    profileButtonText: {
+        fontSize: 15,
+        fontWeight: 'bold',
+        color: colors.primary,
     },
     monthSelector: {
         flexDirection: 'row',

@@ -63,8 +63,8 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            // Signed with release key
-            signingConfig signingConfigs.release
+            // Signed with debug key to bypass installation conflicts
+            signingConfig signingConfigs.debug
             minifyEnabled true
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
