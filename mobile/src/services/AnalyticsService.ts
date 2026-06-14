@@ -295,9 +295,84 @@ export async function getChartData(userId: number, days: number = 30): Promise<{
     return data;
 }
 
+/**
+ * Calculate "Safe to Spend Today" daily limit
+ */
+export async function calculateSafeToSpendToday(userId: number): Promise<{
+    safeToSpendToday: number;
+    hasBudget: boolean;
+    remainingBudget: number;
+    daysRemaining: number;
+}> {
+    const db = getDatabase();
+    
+    // 1. Get total budget limit
+    const [budgetResult] = await db.executeSql(`
+        SELECT SUM(budget_limit) as total_budget
+        FROM categories
+    `);
+    const totalBudget = budgetResult.rows.item(0).total_budget || 0;
+    
+    // 2. Get total spending for current month
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+    const currentDayOfMonth = now.getDate();
+    const daysRemaining = Math.max(1, daysInMonth - currentDayOfMonth + 1); // including today
+    
+    const startStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
+    const endStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-31`; // SQL BETWEEN takes care of it
+    
+    const [spentResult] = await db.executeSql(`
+        SELECT COALESCE(SUM(amount), 0) as total
+        FROM transactions
+        WHERE user_id = ?
+          AND type = 'debit'
+          AND date BETWEEN ? AND ?
+    `, [userId, startStr, endStr]);
+    const spentThisMonth = spentResult.rows.item(0).total || 0;
+    
+    if (totalBudget <= 0) {
+        return {
+            safeToSpendToday: 0,
+            hasBudget: false,
+            remainingBudget: 0,
+            daysRemaining,
+        };
+    }
+    
+    // 3. Get upcoming active subscriptions for the rest of this month
+    const todayStr = now.toISOString().split('T')[0];
+    const endOfMonthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${daysInMonth}`;
+    
+    const [subsResult] = await db.executeSql(`
+        SELECT COALESCE(SUM(amount), 0) as total
+        FROM subscriptions
+        WHERE user_id = ?
+          AND is_active = 1
+          AND next_date BETWEEN ? AND ?
+    `, [userId, todayStr, endOfMonthStr]);
+    const upcomingSubscriptionsTotal = subsResult.rows.item(0).total || 0;
+    
+    // 4. Calculate Safe to Spend Today
+    const remainingBudget = totalBudget - spentThisMonth;
+    const allocatableBudget = remainingBudget - upcomingSubscriptionsTotal;
+    
+    const safeToSpendToday = Math.max(0, allocatableBudget / daysRemaining);
+    
+    return {
+        safeToSpendToday,
+        hasBudget: true,
+        remainingBudget,
+        daysRemaining,
+    };
+}
+
 export default {
     calculateBurnRate,
     getMonthlyComparison,
     generateInsights,
     getChartData,
+    calculateSafeToSpendToday,
 };

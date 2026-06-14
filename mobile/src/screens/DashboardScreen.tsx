@@ -14,6 +14,7 @@ import {
 import { useAppStore } from '../store';
 import { colors, formatCurrency, getMonthName, calculatePercentage } from '../utils';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { checkUpcomingSubscriptionsAndNotify } from '../services/SubscriptionService';
 
 const { width } = Dimensions.get('window');
 
@@ -49,11 +50,14 @@ export default function DashboardScreen({ navigation }: DashboardScreenProps) {
 
     useEffect(() => {
         refreshAll();
+        if (user) {
+            checkUpcomingSubscriptionsAndNotify(user.id);
+        }
         const subscription = DeviceEventEmitter.addListener('TRANSACTION_UPDATED', () => {
             refreshAll();
         });
         return () => subscription.remove();
-    }, []);
+    }, [user]);
 
     const onRefresh = async () => {
         setRefreshing(true);

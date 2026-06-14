@@ -2,6 +2,8 @@
 // Analyzes transaction patterns to detect recurring payments
 
 import { getDatabase, type Transaction } from '../database';
+import { NativeModules } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface DetectedSubscription {
     merchant: string;
@@ -207,9 +209,62 @@ export async function getMonthlySubscriptionCost(userId: number): Promise<number
     }, 0);
 }
 
+/**
+ * Check upcoming active subscriptions and send push notifications if renewing in 0-2 days
+ */
+export async function checkUpcomingSubscriptionsAndNotify(userId: number): Promise<void> {
+    const { NotificationModule } = NativeModules;
+    if (!NotificationModule) {
+        console.log('NotificationModule not found');
+        return;
+    }
+
+    try {
+        const subscriptions = await getActiveSubscriptions(userId);
+        const now = new Date();
+        const todayStr = now.toISOString().split('T')[0];
+
+        // Retrieve the list of already notified subscriptions
+        const notifiedStr = await AsyncStorage.getItem(`notified_subscriptions_${userId}`);
+        const notifiedMap: Record<string, string> = notifiedStr ? JSON.parse(notifiedStr) : {};
+
+        let updated = false;
+
+        for (const sub of subscriptions) {
+            const nextDate = new Date(sub.nextExpectedDate);
+            const diffTime = nextDate.getTime() - now.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            if (diffDays >= 0 && diffDays <= 2) {
+                const mapKey = `${sub.merchant}_${sub.nextExpectedDate}`;
+                
+                if (!notifiedMap[mapKey]) {
+                    const title = 'Subscription Renewal Alert';
+                    const daysWord = diffDays === 0 ? 'today' : (diffDays === 1 ? 'tomorrow' : `in ${diffDays} days`);
+                    const message = `Your subscription to ${sub.merchant} of ₹${Math.round(sub.amount)} is renewing ${daysWord} (${sub.nextExpectedDate}).`;
+                    
+                    const notificationId = Math.abs(mapKey.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0));
+                    
+                    NotificationModule.showNotification(title, message, notificationId);
+                    
+                    notifiedMap[mapKey] = todayStr;
+                    updated = true;
+                }
+            }
+        }
+
+        if (updated) {
+            await AsyncStorage.setItem(`notified_subscriptions_${userId}`, JSON.stringify(notifiedMap));
+        }
+    } catch (error) {
+        console.error('Error in checkUpcomingSubscriptionsAndNotify:', error);
+    }
+}
+
 export default {
     detectSubscriptions,
     saveSubscriptions,
     getActiveSubscriptions,
     getMonthlySubscriptionCost,
+    checkUpcomingSubscriptionsAndNotify,
 };

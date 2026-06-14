@@ -12,6 +12,7 @@ import com.facebook.react.defaults.DefaultReactNativeHost
 import com.facebook.soloader.SoLoader
 import com.expensetracker.sms.SmsPackage
 import com.expensetracker.pdf.PdfPackage
+import com.expensetracker.notification.NotificationPackage
 
 class MainApplication : Application(), ReactApplication {
 
@@ -22,6 +23,7 @@ class MainApplication : Application(), ReactApplication {
                     // Packages that cannot be autolinked yet can be added manually here
                     add(SmsPackage())
                     add(PdfPackage())
+                    add(NotificationPackage())
                 }
 
             override fun getJSMainModuleName(): String = "index"

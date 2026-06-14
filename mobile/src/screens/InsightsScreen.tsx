@@ -17,6 +17,7 @@ import {
     calculateBurnRate,
     generateInsights,
     getChartData,
+    calculateSafeToSpendToday,
     type BurnRateData,
     type SpendingInsight,
 } from '../services/AnalyticsService';
@@ -39,6 +40,12 @@ export default function InsightsScreen() {
     const [subscriptions, setSubscriptions] = useState<DetectedSubscription[]>([]);
     const [monthlyCost, setMonthlyCost] = useState(0);
     const [chartData, setChartData] = useState<{ date: string; amount: number }[]>([]);
+    const [safeToSpend, setSafeToSpend] = useState<{
+        safeToSpendToday: number;
+        hasBudget: boolean;
+        remainingBudget: number;
+        daysRemaining: number;
+    } | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isExporting, setIsExporting] = useState(false);
 
@@ -67,6 +74,9 @@ export default function InsightsScreen() {
 
             const chart = await getChartData(user.id, 30);
             setChartData(chart);
+
+            const safe = await calculateSafeToSpendToday(user.id);
+            setSafeToSpend(safe);
         } catch (error) {
             console.error('Error loading insights:', error);
         }
@@ -148,6 +158,41 @@ export default function InsightsScreen() {
                     )}
                 </TouchableOpacity>
             </View>
+
+            {/* Safe to Spend Today Card */}
+            {safeToSpend && safeToSpend.hasBudget && (
+                <View style={styles.safeToSpendCard}>
+                    <View style={styles.safeToSpendHeader}>
+                        <Text style={styles.cardTitle}>Safe to Spend Today</Text>
+                        <View style={styles.daysBadge}>
+                            <Icon name="event" size={14} color={colors.primary} />
+                            <Text style={styles.daysBadgeText}>
+                                {safeToSpend.daysRemaining} days left
+                            </Text>
+                        </View>
+                    </View>
+                    
+                    <Text style={styles.safeAmount}>
+                        {formatCurrency(safeToSpend.safeToSpendToday)}
+                    </Text>
+                    
+                    <Text style={styles.safeSubtext}>
+                        Remaining budget: {formatCurrency(safeToSpend.remainingBudget)}
+                    </Text>
+                    
+                    <View style={styles.safeProgressContainer}>
+                        <View 
+                            style={[
+                                styles.safeProgressBar, 
+                                { 
+                                    width: `${Math.min(100, Math.max(5, (safeToSpend.safeToSpendToday / (safeToSpend.remainingBudget || 1)) * 100))}%`,
+                                    backgroundColor: safeToSpend.safeToSpendToday > 100 ? colors.success : colors.warning
+                                }
+                            ]} 
+                        />
+                    </View>
+                </View>
+            )}
 
             {/* Burn Rate Card */}
             {burnRate && (
@@ -508,5 +553,55 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: colors.textMuted,
         marginTop: 4,
+    },
+    safeToSpendCard: {
+        backgroundColor: colors.surface,
+        marginHorizontal: 24,
+        borderRadius: 16,
+        padding: 20,
+        marginBottom: 16,
+        borderLeftWidth: 4,
+        borderLeftColor: colors.primary,
+    },
+    safeToSpendHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    daysBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.surfaceLight,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    daysBadgeText: {
+        fontSize: 11,
+        color: colors.textSecondary,
+        marginLeft: 4,
+        fontWeight: '500',
+    },
+    safeAmount: {
+        fontSize: 32,
+        fontWeight: 'bold',
+        color: colors.text,
+        marginVertical: 4,
+    },
+    safeSubtext: {
+        fontSize: 13,
+        color: colors.textSecondary,
+        marginBottom: 12,
+    },
+    safeProgressContainer: {
+        height: 6,
+        backgroundColor: colors.surfaceLight,
+        borderRadius: 3,
+        overflow: 'hidden',
+    },
+    safeProgressBar: {
+        height: '100%',
+        borderRadius: 3,
     },
 });
