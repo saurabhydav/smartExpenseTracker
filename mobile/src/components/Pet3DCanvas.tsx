@@ -914,26 +914,28 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                     particleGroup.remove(particleGroup.children[0]);
                 }
 
-                const particleCount = 18;
-                const pGeo = new THREE.SphereGeometry(0.06, 8, 8);
-                let pColor = 0xf97316;
-                if (currentSpecies === 'dog') pColor = 0x38bdf8;
-                if (currentSpecies === 'bunny') pColor = 0xfacc15;
-                if (currentSpecies === 'panda') pColor = 0x22c55e;
-                if (currentSpecies === 'koala') pColor = 0xa855f7;
+                const particleCount = 24;
+                const pGeo = new THREE.SphereGeometry(0.05, 8, 8);
+                let pColor = 0xfacc15;
+                if (currentSpecies === 'cat') pColor = 0xfacc15;      // Golden Sparkles
+                if (currentSpecies === 'dog') pColor = 0x38bdf8;      // Hydro Aqua Drops
+                if (currentSpecies === 'fox') pColor = 0xf97316;      // Spirit Flame Embers
+                if (currentSpecies === 'bunny') pColor = 0xc084fc;    // Plasma Stars
+                if (currentSpecies === 'panda') pColor = 0x10b981;    // Jade Bamboo Petals
+                if (currentSpecies === 'koala') pColor = 0x06b6d4;    // Eucalyptus Cyan Sparks
 
-                const pMat = new THREE.MeshBasicMaterial({ color: pColor });
+                const pMat = new THREE.MeshBasicMaterial({ color: pColor, transparent: true, opacity: 0.85 });
 
                 for (let i = 0; i < particleCount; i++) {
                     const pMesh = new THREE.Mesh(pGeo, pMat);
                     pMesh.position.set(
-                        (Math.random() - 0.5) * 3.2,
-                        (Math.random() - 0.5) * 3.2,
-                        (Math.random() - 0.5) * 3.2
+                        (Math.random() - 0.5) * 3.6,
+                        (Math.random() - 0.5) * 3.6,
+                        (Math.random() - 0.5) * 3.6
                     );
                     pMesh.userData = {
-                        speedY: 0.01 + Math.random() * 0.02,
-                        rotSpeed: Math.random() * 0.05
+                        speedY: 0.008 + Math.random() * 0.018,
+                        rotSpeed: Math.random() * 0.06
                     };
                     particleGroup.add(pMesh);
                 }
