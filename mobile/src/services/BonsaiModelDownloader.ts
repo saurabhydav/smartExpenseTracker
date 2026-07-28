@@ -229,7 +229,14 @@ class BonsaiModelDownloaderEngine {
         this.lastTime = Date.now();
         this.speedSamples = [];
 
-        const maxRetries = 15;
+        let highestBytesWritten = 0;
+        const partExists = await RNFS.exists(model.tempPath);
+        if (partExists) {
+            const stat = await RNFS.stat(model.tempPath);
+            highestBytesWritten = Number(stat.size);
+        }
+
+        const maxRetries = 25;
         let attempt = 0;
         let isSuccess = false;
 
@@ -237,10 +244,11 @@ class BonsaiModelDownloaderEngine {
             attempt++;
             try {
                 let existingBytes = 0;
-                const partExists = await RNFS.exists(model.tempPath);
-                if (partExists) {
+                const partStatExists = await RNFS.exists(model.tempPath);
+                if (partStatExists) {
                     const stat = await RNFS.stat(model.tempPath);
                     existingBytes = Number(stat.size);
+                    highestBytesWritten = Math.max(highestBytesWritten, existingBytes);
                 }
 
                 // If already completed or close enough, move file and finish
@@ -278,7 +286,7 @@ class BonsaiModelDownloaderEngine {
                         let speedMbps = 0;
 
                         if (timeDiff >= 0.5) {
-                            const bytesDiff = res.bytesWritten - this.lastBytes;
+                            const bytesDiff = Math.max(0, res.bytesWritten - this.lastBytes);
                             const currentSpeed = (bytesDiff / (1024 * 1024)) / timeDiff;
 
                             this.speedSamples.push(currentSpeed);
@@ -289,7 +297,11 @@ class BonsaiModelDownloaderEngine {
                             this.lastTime = now;
                         }
 
-                        const currentBytesOnDisk = existingBytes + res.bytesWritten;
+                        // Ensure currentBytesOnDisk is strictly monotonic (never jumps backward)
+                        const calculatedBytes = existingBytes + res.bytesWritten;
+                        highestBytesWritten = Math.max(highestBytesWritten, calculatedBytes);
+                        const currentBytesOnDisk = highestBytesWritten;
+
                         const totalExpected = model.expectedSizeBytes;
                         const isFinal = currentBytesOnDisk >= totalExpected;
 
@@ -299,8 +311,9 @@ class BonsaiModelDownloaderEngine {
                         }
                         this.lastProgressTime = now;
 
-                        const percent = Math.min(99, Math.round((currentBytesOnDisk / totalExpected) * 100));
-                        const remainingBytes = totalExpected - currentBytesOnDisk;
+                        const rawPercent = Math.round((currentBytesOnDisk / totalExpected) * 100);
+                        const percent = Math.min(99, Math.max(1, rawPercent));
+                        const remainingBytes = Math.max(0, totalExpected - currentBytesOnDisk);
                         const remainingSeconds = speedMbps > 0 ? Math.round((remainingBytes / (1024 * 1024)) / speedMbps) : 0;
 
                         const progressPayload: BonsaiDownloadProgress = {
