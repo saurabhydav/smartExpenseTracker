@@ -346,7 +346,7 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                     petGroup.add(leftW); petGroup.add(rightW);
                 }
 
-                // Pointed Ears
+                // Pointed Ears & Pink Inner Ear Inserts
                 const earGeo = new THREE.ConeGeometry(0.26, 0.6, 12);
                 const leftEar = new THREE.Mesh(earGeo, secMat);
                 leftEar.position.set(-0.42, 1.82, 0.08);
@@ -356,7 +356,14 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                 rightEar.position.set(0.42, 1.82, 0.08);
                 rightEar.rotation.z = 0.25;
 
+                const innerEarGeo = new THREE.ConeGeometry(0.16, 0.45, 12);
+                const leftInnerEar = new THREE.Mesh(innerEarGeo, pinkMat);
+                leftInnerEar.position.set(-0.41, 1.81, 0.12); leftInnerEar.rotation.z = -0.25;
+                const rightInnerEar = new THREE.Mesh(innerEarGeo, pinkMat);
+                rightInnerEar.position.set(0.41, 1.81, 0.12); rightInnerEar.rotation.z = 0.25;
+
                 petGroup.add(leftEar); petGroup.add(rightEar);
+                petGroup.add(leftInnerEar); petGroup.add(rightInnerEar);
 
                 // Long Curved 3-Segment Tail
                 const tailGroup = new THREE.Group();
@@ -373,7 +380,7 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                 tailGroup.add(t1); tailGroup.add(t2);
                 petGroup.add(tailGroup);
 
-                // Arms & Legs
+                // Arms & Legs with Pink Paw Pads
                 const armGeo = new THREE.CylinderGeometry(0.14, 0.1, 0.65, 12);
                 const leftArm = new THREE.Mesh(armGeo, mainMat);
                 leftArm.position.set(-0.85, 0.25, 0.1); leftArm.rotation.z = 0.35; leftArm.name = "leftArm";
@@ -386,6 +393,13 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                 const leftLeg = new THREE.Mesh(legGeo, mainMat); leftLeg.position.set(-0.5, -0.85, 0.18);
                 const rightLeg = new THREE.Mesh(legGeo, mainMat); rightLeg.position.set(0.5, -0.85, 0.18);
                 petGroup.add(leftLeg); petGroup.add(rightLeg);
+
+                const padGeo = new THREE.SphereGeometry(0.04, 8, 8);
+                for (let p = -1; p <= 1; p++) {
+                    const lPad = new THREE.Mesh(padGeo, pinkMat); lPad.position.set(-0.85 + p * 0.05, -0.05, 0.22);
+                    const rPad = new THREE.Mesh(padGeo, pinkMat); rPad.position.set(0.85 + p * 0.05, -0.05, 0.22);
+                    petGroup.add(lPad); petGroup.add(rPad);
+                }
 
                 // Stage 6+ Dual Fiery Horns
                 if (currentStage >= 6) {
@@ -478,7 +492,7 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                 boneMesh.position.set(0, 0.5, 0.85);
                 petGroup.add(boneMesh);
 
-                // Floppy Drooping Ears
+                // Floppy Drooping Ears & Inner Ear Folds
                 const earGeo = new THREE.CylinderGeometry(0.18, 0.26, 0.75, 12);
                 const leftEar = new THREE.Mesh(earGeo, secMat);
                 leftEar.position.set(-0.82, 1.2, 0.1); leftEar.rotation.z = 0.5; leftEar.rotation.x = 0.2;
@@ -486,7 +500,14 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                 const rightEar = new THREE.Mesh(earGeo, secMat);
                 rightEar.position.set(0.82, 1.2, 0.1); rightEar.rotation.z = -0.5; rightEar.rotation.x = 0.2;
 
+                const innerEarGeo = new THREE.CylinderGeometry(0.12, 0.2, 0.65, 12);
+                const leftInnerEar = new THREE.Mesh(innerEarGeo, bellyMat);
+                leftInnerEar.position.set(-0.8, 1.2, 0.16); leftInnerEar.rotation.z = 0.5; leftInnerEar.rotation.x = 0.2;
+                const rightInnerEar = new THREE.Mesh(innerEarGeo, bellyMat);
+                rightInnerEar.position.set(0.8, 1.2, 0.16); rightInnerEar.rotation.z = -0.5; rightInnerEar.rotation.x = 0.2;
+
                 petGroup.add(leftEar); petGroup.add(rightEar);
+                petGroup.add(leftInnerEar); petGroup.add(rightInnerEar);
 
                 // Medium Upward Curved Dog Tail (Wagging Animation Target)
                 const tailGeo = new THREE.CylinderGeometry(0.1, 0.2, 0.9, 12);
@@ -579,11 +600,17 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                 petGroup.add(leftPupil); petGroup.add(rightPupil);
                 petGroup.add(leftCatch); petGroup.add(rightCatch);
 
-                // Large Sharp Upright Ears (Ear Swivel Target)
+                // Large Sharp Upright Ears & White Inner Ear Fluff
                 const earGeo = new THREE.ConeGeometry(0.32, 0.7, 12);
                 const leftEar = new THREE.Mesh(earGeo, secMat); leftEar.position.set(-0.45, 1.85, 0.08); leftEar.rotation.z = -0.2; leftEar.name = "leftEar";
                 const rightEar = new THREE.Mesh(earGeo, secMat); rightEar.position.set(0.45, 1.85, 0.08); rightEar.rotation.z = 0.2; rightEar.name = "rightEar";
+
+                const innerFluffGeo = new THREE.ConeGeometry(0.2, 0.5, 12);
+                const leftFluff = new THREE.Mesh(innerFluffGeo, whiteMat); leftFluff.position.set(-0.44, 1.84, 0.12); leftFluff.rotation.z = -0.2;
+                const rightFluff = new THREE.Mesh(innerFluffGeo, whiteMat); rightFluff.position.set(0.44, 1.84, 0.12); rightFluff.rotation.z = 0.2;
+
                 petGroup.add(leftEar); petGroup.add(rightEar);
+                petGroup.add(leftFluff); petGroup.add(rightFluff);
 
                 // Large Bushy Brush Tail with Distinct White Tip
                 const tailGroup = new THREE.Group();
@@ -687,18 +714,29 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                 petGroup.add(leftPupil); petGroup.add(rightPupil);
                 petGroup.add(leftCatch); petGroup.add(rightCatch);
 
-                // Tall Ears
+                // Tall Ears & Pink Inner Ear Inserts
                 const earGeo = new THREE.CylinderGeometry(0.09, 0.18, 1.6, 14);
                 const leftEar = new THREE.Mesh(earGeo, secMat); leftEar.position.set(-0.35, 2.25, 0.0); leftEar.rotation.z = -0.15;
                 const rightEar = new THREE.Mesh(earGeo, secMat); rightEar.position.set(0.35, 2.25, 0.0); rightEar.rotation.z = 0.15;
-                petGroup.add(leftEar); petGroup.add(rightEar);
 
-                // Round Cotton Ball Tail
-                const tailGeo = new THREE.SphereGeometry(0.22, 16, 16);
-                const tailMesh = new THREE.Mesh(tailGeo, whiteMat);
-                tailMesh.position.set(0, -0.3, -0.85);
-                tailMesh.name = "tail";
-                petGroup.add(tailMesh);
+                const innerEarGeo = new THREE.CylinderGeometry(0.05, 0.12, 1.3, 12);
+                const leftInner = new THREE.Mesh(innerEarGeo, pinkMat); leftInner.position.set(-0.34, 2.24, 0.05); leftInner.rotation.z = -0.15;
+                const rightInner = new THREE.Mesh(innerEarGeo, pinkMat); rightInner.position.set(0.34, 2.24, 0.05); rightInner.rotation.z = 0.15;
+
+                petGroup.add(leftEar); petGroup.add(rightEar);
+                petGroup.add(leftInner); petGroup.add(rightInner);
+
+                // Multi-Sphere Fluffy Cotton Ball Tail
+                const tailGroup = new THREE.Group();
+                tailGroup.position.set(0, -0.3, -0.85);
+                tailGroup.name = "tail";
+
+                const mainTail = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), whiteMat);
+                const subTail1 = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 12), whiteMat); subTail1.position.set(-0.08, 0.08, 0);
+                const subTail2 = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 12), whiteMat); subTail2.position.set(0.08, 0.08, 0);
+
+                tailGroup.add(mainTail); tailGroup.add(subTail1); tailGroup.add(subTail2);
+                petGroup.add(tailGroup);
 
                 // Small Front Paws & LARGE HIND HAUNCHES (Asymmetric Proportions)
                 const frontArmGeo = new THREE.CylinderGeometry(0.1, 0.08, 0.45, 12);
@@ -821,6 +859,14 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                 const leftLeg = new THREE.Mesh(legGeo, darkMat); leftLeg.position.set(-0.6, -0.85, 0.2);
                 const rightLeg = new THREE.Mesh(legGeo, darkMat); rightLeg.position.set(0.6, -0.85, 0.2);
                 petGroup.add(leftLeg); petGroup.add(rightLeg);
+
+                // White Paw Claw Tips
+                const clawGeo = new THREE.ConeGeometry(0.03, 0.1, 6);
+                for (let c = -1; c <= 1; c++) {
+                    const lc = new THREE.Mesh(clawGeo, whiteMat); lc.position.set(-0.95 + c * 0.04, -0.1, 0.25); lc.rotation.x = Math.PI * 0.4;
+                    const rc = new THREE.Mesh(clawGeo, whiteMat); rc.position.set(0.95 + c * 0.04, -0.1, 0.25); rc.rotation.x = Math.PI * 0.4;
+                    petGroup.add(lc); petGroup.add(rc);
+                }
 
                 // Stage 6+ Bamboo Staff
                 if (currentStage >= 6) {
