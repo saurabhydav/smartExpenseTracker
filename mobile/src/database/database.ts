@@ -40,10 +40,6 @@ export async function initDatabase(): Promise<void> {
             await db.executeSql(sql);
         }
 
-        // Performance & Multi-threading Composite Indexes (Sub-5ms query target)
-        await db.executeSql('CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(user_id, date, type)');
-        await db.executeSql('CREATE INDEX IF NOT EXISTS idx_transactions_category ON transactions(user_id, category_id)');
-
 
         // Create accounts table
         const { CREATE_ACCOUNTS_TABLE_SQL } = require('./schema');
@@ -215,6 +211,8 @@ export async function initDatabase(): Promise<void> {
         // Create user_id index if it doesn't exist (safe to run after migration or on fresh install if table exists)
         // We do this here because putting it in CREATE_TABLES_SQL fails for existing users before migration ran
         await db.executeSql('CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id)');
+        await db.executeSql('CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(user_id, date, type)');
+        await db.executeSql('CREATE INDEX IF NOT EXISTS idx_transactions_category ON transactions(user_id, category_id)');
         await db.executeSql('CREATE INDEX IF NOT EXISTS idx_transactions_merchant_upper ON transactions(UPPER(merchant))');
 
         // Fix invalid icons from previous seeds
