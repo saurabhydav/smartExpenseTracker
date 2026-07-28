@@ -158,6 +158,11 @@ class BonsaiModelDownloaderEngine {
 
     async checkSpecificModelStatus(model: BonsaiModelMetadata): Promise<BonsaiModelStatus> {
         try {
+            // Guard: If this model is currently in an active download/load state, preserve active status
+            if (this.activeModel?.id === model.id && (this.status === 'DOWNLOADING' || this.status === 'VERIFYING' || this.status === 'LOADING_MODEL')) {
+                return this.status;
+            }
+
             await this.ensureModelsDirectory();
             const exists = await RNFS.exists(model.localPath);
             if (exists) {
@@ -174,7 +179,7 @@ class BonsaiModelDownloaderEngine {
             }
 
             const partExists = await RNFS.exists(model.tempPath);
-            if (partExists) return 'PAUSED';
+            if (partExists && this.status !== 'DOWNLOADING') return 'PAUSED';
 
             return 'NOT_DOWNLOADED';
         } catch (e) {
