@@ -239,20 +239,16 @@ export const BonsaiModelCard: React.FC<BonsaiModelCardProps> = ({
                 )}
 
                 {status === 'READY' && !isLoaded && (
-                    <TouchableOpacity 
-                        style={styles.loadButton} 
-                        onPress={handleLoadModel}
-                        disabled={isLoadingModel}
-                    >
-                        {isLoadingModel ? (
-                            <ActivityIndicator color="#fff" size="small" />
-                        ) : (
-                            <Icon name="bolt" size={18} color="#fff" />
-                        )}
-                        <Text style={styles.buttonText}>
-                            {isLoadingModel ? 'Loading to Memory...' : 'Load Model into RAM'}
-                        </Text>
-                    </TouchableOpacity>
+                    <View style={styles.loadedActions}>
+                        <View style={styles.readyTag}>
+                            <Icon name="check-circle" size={16} color="#10b981" />
+                            <Text style={styles.readyText}>Ready</Text>
+                        </View>
+                        <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteModel}>
+                            <Icon name="delete-outline" size={16} color="#ef4444" />
+                            <Text style={styles.deleteText}>Delete</Text>
+                        </TouchableOpacity>
+                    </View>
                 )}
 
                 {isLoaded && (
@@ -485,6 +481,20 @@ const styles = StyleSheet.create({
         justifyContent: 'space-around',
         alignItems: 'center',
         paddingTop: 4,
+    },
+    readyTag: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    },
+    readyText: {
+        color: '#10b981',
+        fontSize: 13,
+        fontWeight: '700',
     },
     unloadButton: {
         flexDirection: 'row',
