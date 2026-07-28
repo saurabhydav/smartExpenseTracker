@@ -148,9 +148,12 @@ class BonsaiModelDownloaderEngine {
             };
         }
 
-        // Note: minRamGB check for heavy 3B models
+        // Real RAM safety check for heavy 3B models (>4.0GB RAM requirement)
         if (model.minRamGB > 4.0) {
-            console.log(`[BonsaiDownloader] Model ${model.modelName} requires high device RAM (${model.minRamGB}GB).`);
+            return {
+                isCompatible: true,
+                reason: `High memory footprint (${model.minRamGB}GB RAM required). May cause background app restarts on 3-4GB devices.`
+            };
         }
 
         return { isCompatible: true };

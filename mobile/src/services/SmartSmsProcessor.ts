@@ -363,6 +363,15 @@ export async function processSmartSms(
         originalMerchant: parsed.merchant, // Store raw name as stable ID
     });
 
+    // Step 4.5: Update Pet Gamification (SMS auto-capture wiring)
+    try {
+        const { processTransactionGamification, applyGamificationUpdate } = require('./TamagotchiService');
+        const gamification = processTransactionGamification(parsed.type, parsed.amount, 'SMS Transaction', false);
+        applyGamificationUpdate(gamification.expDelta, gamification.coinDelta);
+    } catch (gErr) {
+        console.warn('[SmartSmsProcessor] Pet gamification update skipped:', gErr);
+    }
+
     console.log(`Transaction saved with ID: ${transactionId} `);
     if (!suppressNotification) {
         DeviceEventEmitter.emit('TRANSACTION_UPDATED');

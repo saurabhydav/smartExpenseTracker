@@ -162,24 +162,38 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
             }
 
             // =========================================================
-            // 3D SPECIES & METAMORPHOSIS MESH BUILDER
+            // RECURSIVE DISPOSAL HELPER (Prevents WebGL Memory Leaks)
+            // =========================================================
+            function disposeGroup(group) {
+                while (group.children.length > 0) {
+                    const child = group.children[0];
+                    if (child.children && child.children.length > 0) {
+                        disposeGroup(child);
+                    }
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) {
+                        if (Array.isArray(child.material)) {
+                            child.material.forEach(m => m.dispose());
+                        } else {
+                            child.material.dispose();
+                        }
+                    }
+                    group.remove(child);
+                }
+            }
+
+            // =========================================================
+            // 3D SPECIES & METAMORPHOSIS MESH BUILDER (PER-SPECIES ARCHITECTURE)
             // =========================================================
             function buildPetMesh() {
-                // Clear old meshes
-                while (petGroup.children.length > 0) {
-                    petGroup.remove(petGroup.children[0]);
-                }
-                while (auraGroup.children.length > 0) {
-                    auraGroup.remove(auraGroup.children[0]);
-                }
+                // Clear & Dispose old meshes safely
+                disposeGroup(petGroup);
+                disposeGroup(auraGroup);
 
                 const scaleFactor = 0.75 + currentStage * 0.045;
                 petGroup.scale.set(scaleFactor, scaleFactor, scaleFactor);
 
-                const mainMat = new THREE.MeshToonMaterial({
-                    color: primaryHex,
-                    gradientMap: null
-                });
+                const mainMat = new THREE.MeshToonMaterial({ color: primaryHex });
                 const secMat = new THREE.MeshToonMaterial({ color: secondaryHex });
                 const bellyMat = new THREE.MeshToonMaterial({ color: bellyHex });
                 const goldMat = new THREE.MeshStandardMaterial({ color: 0xeab308, metalness: 0.8, roughness: 0.2 });
@@ -206,143 +220,613 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                     petGroup.add(eggMesh);
                 }
 
-                // 3D Body (Sphere / Capsule)
-                const bodyGeo = new THREE.SphereGeometry(1.0, 24, 24);
-                bodyGeo.scale(1, 1.15, 0.95);
+                // Call Dedicated Per-Species Builder
+                if (currentSpecies === 'cat') {
+                    buildCatMesh(mainMat, secMat, bellyMat, darkMat, whiteMat, pinkMat, armorMat);
+                } else if (currentSpecies === 'dog') {
+                    buildDogMesh(mainMat, secMat, bellyMat, darkMat, whiteMat, pinkMat, armorMat);
+                } else if (currentSpecies === 'fox') {
+                    buildFoxMesh(mainMat, secMat, bellyMat, darkMat, whiteMat, pinkMat, armorMat);
+                } else if (currentSpecies === 'bunny') {
+                    buildBunnyMesh(mainMat, secMat, bellyMat, darkMat, whiteMat, pinkMat, armorMat);
+                } else if (currentSpecies === 'panda') {
+                    buildPandaMesh(mainMat, secMat, bellyMat, darkMat, whiteMat, pinkMat, armorMat);
+                } else if (currentSpecies === 'koala') {
+                    buildKoalaMesh(mainMat, secMat, bellyMat, darkMat, whiteMat, pinkMat, armorMat);
+                } else {
+                    buildCatMesh(mainMat, secMat, bellyMat, darkMat, whiteMat, pinkMat, armorMat);
+                }
+
+                // Universal Accessories Across Evolution Stages
+                buildUniversalAccessories(mainMat, secMat, bellyMat, goldMat, darkMat, whiteMat, armorMat, crystalMat);
+
+                build3DParticles();
+            }
+
+            // ---------------------------------------------------------
+            // 🐱 1. CAT MESH BUILDER (Milo - Lean, Whiskers, Curved Tail)
+            // ---------------------------------------------------------
+            function buildCatMesh(mainMat, secMat, bellyMat, darkMat, whiteMat, pinkMat, armorMat) {
+                // Slim Torso
+                const bodyGeo = new THREE.SphereGeometry(0.95, 24, 24);
+                bodyGeo.scale(0.85, 1.15, 0.85);
                 const bodyMesh = new THREE.Mesh(bodyGeo, mainMat);
                 bodyMesh.position.y = 0.1;
                 petGroup.add(bodyMesh);
 
-                // Belly Patch
-                const bellyGeo = new THREE.SphereGeometry(0.7, 20, 20);
-                bellyGeo.scale(0.85, 1.0, 0.4);
+                const bellyGeo = new THREE.SphereGeometry(0.65, 20, 20);
+                bellyGeo.scale(0.8, 0.95, 0.4);
                 const bellyMesh = new THREE.Mesh(bellyGeo, bellyMat);
-                bellyMesh.position.set(0, 0.05, 0.75);
+                bellyMesh.position.set(0, 0.05, 0.68);
                 petGroup.add(bellyMesh);
 
-                // 3D Head
+                // Angular Head
+                const headGeo = new THREE.SphereGeometry(0.8, 24, 24);
+                headGeo.scale(0.95, 0.92, 0.95);
+                const headMesh = new THREE.Mesh(headGeo, mainMat);
+                headMesh.position.set(0, 1.1, 0.1);
+                headMesh.name = "head";
+                petGroup.add(headMesh);
+
+                // Almond Eyes & Pupils
+                const eyeGeo = new THREE.SphereGeometry(0.12, 16, 16);
+                eyeGeo.scale(1.1, 0.9, 0.8);
+                const leftEye = new THREE.Mesh(eyeGeo, darkMat);
+                leftEye.position.set(-0.28, 1.18, 0.78);
+                leftEye.rotation.z = -0.15;
+
+                const rightEye = new THREE.Mesh(eyeGeo, darkMat);
+                rightEye.position.set(0.28, 1.18, 0.78);
+                rightEye.rotation.z = 0.15;
+
+                const pupilGeo = new THREE.SphereGeometry(0.04, 12, 12);
+                const leftPupil = new THREE.Mesh(pupilGeo, whiteMat);
+                leftPupil.position.set(-0.26, 1.22, 0.87);
+                const rightPupil = new THREE.Mesh(pupilGeo, whiteMat);
+                rightPupil.position.set(0.30, 1.22, 0.87);
+
+                petGroup.add(leftEye); petGroup.add(rightEye);
+                petGroup.add(leftPupil); petGroup.add(rightPupil);
+
+                // Rounded Cat Snout & Pink Nose
+                const snoutGeo = new THREE.SphereGeometry(0.14, 16, 16);
+                snoutGeo.scale(1.2, 0.8, 0.9);
+                const snoutMesh = new THREE.Mesh(snoutGeo, bellyMat);
+                snoutMesh.position.set(0, 1.04, 0.78);
+                petGroup.add(snoutMesh);
+
+                const noseGeo = new THREE.SphereGeometry(0.05, 12, 12);
+                const noseMesh = new THREE.Mesh(noseGeo, pinkMat);
+                noseMesh.position.set(0, 1.08, 0.9);
+                petGroup.add(noseMesh);
+
+                // 6 Thin Whisker Lines
+                for (let w = -1; w <= 1; w++) {
+                    const whiskerGeo = new THREE.CylinderGeometry(0.008, 0.008, 0.4, 8);
+                    const leftW = new THREE.Mesh(whiskerGeo, darkMat);
+                    leftW.position.set(-0.35, 1.04 + w * 0.05, 0.8);
+                    leftW.rotation.z = Math.PI * 0.5 + w * 0.15;
+
+                    const rightW = new THREE.Mesh(whiskerGeo, darkMat);
+                    rightW.position.set(0.35, 1.04 + w * 0.05, 0.8);
+                    rightW.rotation.z = -Math.PI * 0.5 - w * 0.15;
+
+                    petGroup.add(leftW); petGroup.add(rightW);
+                }
+
+                // Pointed Ears
+                const earGeo = new THREE.ConeGeometry(0.26, 0.6, 12);
+                const leftEar = new THREE.Mesh(earGeo, secMat);
+                leftEar.position.set(-0.42, 1.82, 0.08);
+                leftEar.rotation.z = -0.25;
+
+                const rightEar = new THREE.Mesh(earGeo, secMat);
+                rightEar.position.set(0.42, 1.82, 0.08);
+                rightEar.rotation.z = 0.25;
+
+                petGroup.add(leftEar); petGroup.add(rightEar);
+
+                // Long Curved 3-Segment Tail
+                const tailGroup = new THREE.Group();
+                tailGroup.position.set(0, -0.2, -0.85);
+                tailGroup.name = "tail";
+
+                const t1 = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 0.5, 12), secMat);
+                t1.position.set(0, 0.2, 0);
+                t1.rotation.x = -0.6;
+                const t2 = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 0.5, 12), secMat);
+                t2.position.set(0, 0.5, -0.15);
+                t2.rotation.x = -0.3;
+
+                tailGroup.add(t1); tailGroup.add(t2);
+                petGroup.add(tailGroup);
+
+                // Arms & Legs
+                const armGeo = new THREE.CylinderGeometry(0.14, 0.1, 0.65, 12);
+                const leftArm = new THREE.Mesh(armGeo, mainMat);
+                leftArm.position.set(-0.85, 0.25, 0.1); leftArm.rotation.z = 0.35; leftArm.name = "leftArm";
+                const rightArm = new THREE.Mesh(armGeo, mainMat);
+                rightArm.position.set(0.85, 0.25, 0.1); rightArm.rotation.z = -0.35; rightArm.name = "rightArm";
+                petGroup.add(leftArm); petGroup.add(rightArm);
+
+                const legGeo = new THREE.SphereGeometry(0.28, 16, 16);
+                legGeo.scale(0.75, 1.15, 1.35);
+                const leftLeg = new THREE.Mesh(legGeo, mainMat); leftLeg.position.set(-0.5, -0.85, 0.18);
+                const rightLeg = new THREE.Mesh(legGeo, mainMat); rightLeg.position.set(0.5, -0.85, 0.18);
+                petGroup.add(leftLeg); petGroup.add(rightLeg);
+
+                // Stage 6+ Dual Fiery Horns
+                if (currentStage >= 6) {
+                    const hornGeo = new THREE.ConeGeometry(0.12, 0.5, 12);
+                    const hornMat = new THREE.MeshToonMaterial({ color: 0xef4444 });
+                    const leftHorn = new THREE.Mesh(hornGeo, hornMat); leftHorn.position.set(-0.35, 1.85, 0.1); leftHorn.rotation.z = -0.4;
+                    const rightHorn = new THREE.Mesh(hornGeo, hornMat); rightHorn.position.set(0.35, 1.85, 0.1); rightHorn.rotation.z = 0.4;
+                    petGroup.add(leftHorn); petGroup.add(rightHorn);
+                }
+            }
+
+            // ---------------------------------------------------------
+            // 🐶 2. DOG MESH BUILDER (Buddy - Stocky, Wagging Tail, Snout, Floppy Ears)
+            // ---------------------------------------------------------
+            function buildDogMesh(mainMat, secMat, bellyMat, darkMat, whiteMat, pinkMat, armorMat) {
+                // Stocky Broad Torso
+                const bodyGeo = new THREE.SphereGeometry(1.05, 24, 24);
+                bodyGeo.scale(1.1, 1.05, 1.0);
+                const bodyMesh = new THREE.Mesh(bodyGeo, mainMat);
+                bodyMesh.position.y = 0.1;
+                petGroup.add(bodyMesh);
+
+                const bellyGeo = new THREE.SphereGeometry(0.7, 20, 20);
+                bellyGeo.scale(0.9, 0.95, 0.45);
+                const bellyMesh = new THREE.Mesh(bellyGeo, bellyMat);
+                bellyMesh.position.set(0, 0.05, 0.78);
+                petGroup.add(bellyMesh);
+
+                // Round Friendly Head
+                const headGeo = new THREE.SphereGeometry(0.85, 24, 24);
+                const headMesh = new THREE.Mesh(headGeo, mainMat);
+                headMesh.position.set(0, 1.1, 0.1);
+                headMesh.name = "head";
+                petGroup.add(headMesh);
+
+                // Protruding Dog Snout / Muzzle
+                const snoutGeo = new THREE.BoxGeometry(0.38, 0.28, 0.38);
+                const snoutMesh = new THREE.Mesh(snoutGeo, bellyMat);
+                snoutMesh.position.set(0, 1.02, 0.82);
+                petGroup.add(snoutMesh);
+
+                const noseGeo = new THREE.SphereGeometry(0.08, 12, 12);
+                const noseMesh = new THREE.Mesh(noseGeo, darkMat);
+                noseMesh.position.set(0, 1.12, 1.0);
+                petGroup.add(noseMesh);
+
+                // Poking Pink Tongue
+                const tongueGeo = new THREE.SphereGeometry(0.06, 12, 12);
+                tongueGeo.scale(1.0, 1.4, 0.5);
+                const tongueMesh = new THREE.Mesh(tongueGeo, pinkMat);
+                tongueMesh.position.set(0.06, 0.94, 0.98);
+                tongueMesh.rotation.x = 0.3;
+                petGroup.add(tongueMesh);
+
+                // Friendly Round Eyes
+                const eyeGeo = new THREE.SphereGeometry(0.12, 16, 16);
+                const leftEye = new THREE.Mesh(eyeGeo, darkMat); leftEye.position.set(-0.3, 1.2, 0.8);
+                const rightEye = new THREE.Mesh(eyeGeo, darkMat); rightEye.position.set(0.3, 1.2, 0.8);
+
+                const pupilGeo = new THREE.SphereGeometry(0.04, 12, 12);
+                const leftPupil = new THREE.Mesh(pupilGeo, whiteMat); leftPupil.position.set(-0.28, 1.23, 0.9);
+                const rightPupil = new THREE.Mesh(pupilGeo, whiteMat); rightPupil.position.set(0.32, 1.23, 0.9);
+
+                petGroup.add(leftEye); petGroup.add(rightEye);
+                petGroup.add(leftPupil); petGroup.add(rightPupil);
+
+                // Floppy Drooping Ears
+                const earGeo = new THREE.CylinderGeometry(0.18, 0.26, 0.75, 12);
+                const leftEar = new THREE.Mesh(earGeo, secMat);
+                leftEar.position.set(-0.82, 1.2, 0.1); leftEar.rotation.z = 0.5; leftEar.rotation.x = 0.2;
+
+                const rightEar = new THREE.Mesh(earGeo, secMat);
+                rightEar.position.set(0.82, 1.2, 0.1); rightEar.rotation.z = -0.5; rightEar.rotation.x = 0.2;
+
+                petGroup.add(leftEar); petGroup.add(rightEar);
+
+                // Medium Upward Curved Dog Tail (Wagging Animation Target)
+                const tailGeo = new THREE.CylinderGeometry(0.1, 0.2, 0.9, 12);
+                const tailMesh = new THREE.Mesh(tailGeo, secMat);
+                tailMesh.position.set(0, -0.15, -0.9);
+                tailMesh.rotation.x = -1.1;
+                tailMesh.name = "tail";
+                petGroup.add(tailMesh);
+
+                // Arms & Legs
+                const armGeo = new THREE.CylinderGeometry(0.18, 0.14, 0.7, 12);
+                const leftArm = new THREE.Mesh(armGeo, mainMat); leftArm.position.set(-0.92, 0.25, 0.1); leftArm.rotation.z = 0.4; leftArm.name = "leftArm";
+                const rightArm = new THREE.Mesh(armGeo, mainMat); rightArm.position.set(0.92, 0.25, 0.1); rightArm.rotation.z = -0.4; rightArm.name = "rightArm";
+                petGroup.add(leftArm); petGroup.add(rightArm);
+
+                const legGeo = new THREE.SphereGeometry(0.32, 16, 16);
+                legGeo.scale(0.85, 1.2, 1.4);
+                const leftLeg = new THREE.Mesh(legGeo, mainMat); leftLeg.position.set(-0.58, -0.85, 0.2);
+                const rightLeg = new THREE.Mesh(legGeo, mainMat); rightLeg.position.set(0.58, -0.85, 0.2);
+                petGroup.add(leftLeg); petGroup.add(rightLeg);
+
+                // Stage 6+ Dual Hydro Cannons
+                if (currentStage >= 6) {
+                    const cannonGeo = new THREE.CylinderGeometry(0.12, 0.16, 0.9, 12);
+                    const leftCannon = new THREE.Mesh(cannonGeo, armorMat); leftCannon.position.set(-0.7, 0.7, -0.3); leftCannon.rotation.x = -0.4;
+                    const rightCannon = new THREE.Mesh(cannonGeo, armorMat); rightCannon.position.set(0.7, 0.7, -0.3); rightCannon.rotation.x = -0.4;
+                    petGroup.add(leftCannon); petGroup.add(rightCannon);
+                }
+            }
+
+            // ---------------------------------------------------------
+            // 🦊 3. FOX MESH BUILDER (Rusty - Sharp Snout, Bushy Tail w/ White Tip, Socks)
+            // ---------------------------------------------------------
+            function buildFoxMesh(mainMat, secMat, bellyMat, darkMat, whiteMat, pinkMat, armorMat) {
+                // Leggy Slender Torso
+                const bodyGeo = new THREE.SphereGeometry(0.95, 24, 24);
+                bodyGeo.scale(0.85, 1.12, 0.85);
+                const bodyMesh = new THREE.Mesh(bodyGeo, mainMat);
+                bodyMesh.position.y = 0.1;
+                petGroup.add(bodyMesh);
+
+                const bellyGeo = new THREE.SphereGeometry(0.65, 20, 20);
+                bellyGeo.scale(0.8, 0.95, 0.4);
+                const bellyMesh = new THREE.Mesh(bellyGeo, bellyMat);
+                bellyMesh.position.set(0, 0.05, 0.68);
+                petGroup.add(bellyMesh);
+
+                // Sharp Angled Head
+                const headGeo = new THREE.SphereGeometry(0.82, 24, 24);
+                headGeo.scale(0.92, 0.9, 0.92);
+                const headMesh = new THREE.Mesh(headGeo, mainMat);
+                headMesh.position.set(0, 1.1, 0.1);
+                headMesh.name = "head";
+                petGroup.add(headMesh);
+
+                // Elongated Pointed Fox Snout
+                const snoutGeo = new THREE.ConeGeometry(0.22, 0.55, 16);
+                const snoutMesh = new THREE.Mesh(snoutGeo, bellyMat);
+                snoutMesh.position.set(0, 1.02, 0.85);
+                snoutMesh.rotation.x = Math.PI * 0.5;
+                petGroup.add(snoutMesh);
+
+                const noseGeo = new THREE.SphereGeometry(0.06, 12, 12);
+                const noseMesh = new THREE.Mesh(noseGeo, darkMat);
+                noseMesh.position.set(0, 1.02, 1.12);
+                petGroup.add(noseMesh);
+
+                // Alert Angled Eyes
+                const eyeGeo = new THREE.SphereGeometry(0.11, 16, 16);
+                eyeGeo.scale(1.2, 0.8, 0.7);
+                const leftEye = new THREE.Mesh(eyeGeo, darkMat); leftEye.position.set(-0.28, 1.18, 0.76); leftEye.rotation.z = -0.25;
+                const rightEye = new THREE.Mesh(eyeGeo, darkMat); rightEye.position.set(0.28, 1.18, 0.76); rightEye.rotation.z = 0.25;
+
+                const pupilGeo = new THREE.SphereGeometry(0.04, 12, 12);
+                const leftPupil = new THREE.Mesh(pupilGeo, whiteMat); leftPupil.position.set(-0.26, 1.22, 0.84);
+                const rightPupil = new THREE.Mesh(pupilGeo, whiteMat); rightPupil.position.set(0.30, 1.22, 0.84);
+
+                petGroup.add(leftEye); petGroup.add(rightEye);
+                petGroup.add(leftPupil); petGroup.add(rightPupil);
+
+                // Large Sharp Upright Ears (Ear Swivel Target)
+                const earGeo = new THREE.ConeGeometry(0.32, 0.7, 12);
+                const leftEar = new THREE.Mesh(earGeo, secMat); leftEar.position.set(-0.45, 1.85, 0.08); leftEar.rotation.z = -0.2; leftEar.name = "leftEar";
+                const rightEar = new THREE.Mesh(earGeo, secMat); rightEar.position.set(0.45, 1.85, 0.08); rightEar.rotation.z = 0.2; rightEar.name = "rightEar";
+                petGroup.add(leftEar); petGroup.add(rightEar);
+
+                // Large Bushy Brush Tail with Distinct White Tip
+                const tailGroup = new THREE.Group();
+                tailGroup.position.set(0, -0.15, -0.9);
+                tailGroup.name = "tail";
+
+                const mainTailGeo = new THREE.CylinderGeometry(0.08, 0.32, 1.1, 14);
+                const mainTail = new THREE.Mesh(mainTailGeo, secMat);
+                mainTail.position.set(0, 0.4, 0);
+                mainTail.rotation.x = -0.8;
+
+                const tipTailGeo = new THREE.ConeGeometry(0.18, 0.45, 14);
+                const tipTail = new THREE.Mesh(tipTailGeo, whiteMat);
+                tipTail.position.set(0, 0.95, -0.32);
+                tipTail.rotation.x = -0.8;
+
+                tailGroup.add(mainTail); tailGroup.add(tipTail);
+                petGroup.add(tailGroup);
+
+                // Arms & Legs with Dark Paw Socks
+                const armGeo = new THREE.CylinderGeometry(0.14, 0.1, 0.65, 12);
+                const leftArm = new THREE.Mesh(armGeo, mainMat); leftArm.position.set(-0.85, 0.25, 0.1); leftArm.rotation.z = 0.35; leftArm.name = "leftArm";
+                const rightArm = new THREE.Mesh(armGeo, mainMat); rightArm.position.set(0.85, 0.25, 0.1); rightArm.rotation.z = -0.35; rightArm.name = "rightArm";
+                petGroup.add(leftArm); petGroup.add(rightArm);
+
+                const legGeo = new THREE.SphereGeometry(0.28, 16, 16);
+                legGeo.scale(0.75, 1.25, 1.35);
+                const leftLeg = new THREE.Mesh(legGeo, darkMat); leftLeg.position.set(-0.5, -0.88, 0.18);
+                const rightLeg = new THREE.Mesh(legGeo, darkMat); rightLeg.position.set(0.5, -0.88, 0.18);
+                petGroup.add(leftLeg); petGroup.add(rightLeg);
+
+                // Stage 6+ 6 Kitsune Tails
+                if (currentStage >= 6) {
+                    for (let t = -3; t <= 3; t++) {
+                        if (t === 0) continue;
+                        const kTailGeo = new THREE.CylinderGeometry(0.06, 0.18, 1.3, 12);
+                        const kTailMesh = new THREE.Mesh(kTailGeo, secMat);
+                        kTailMesh.position.set(t * 0.22, -0.1, -0.85);
+                        kTailMesh.rotation.x = -0.9; kTailMesh.rotation.z = t * 0.25;
+                        petGroup.add(kTailMesh);
+                    }
+                }
+            }
+
+            // ---------------------------------------------------------
+            // 🐰 4. BUNNY MESH BUILDER (Luna - Large Haunches, Buck Teeth, Cotton Tail, Hop Idle)
+            // ---------------------------------------------------------
+            function buildBunnyMesh(mainMat, secMat, bellyMat, darkMat, whiteMat, pinkMat, armorMat) {
+                // Soft Rounded Body
+                const bodyGeo = new THREE.SphereGeometry(1.0, 24, 24);
+                bodyGeo.scale(0.9, 1.1, 0.9);
+                const bodyMesh = new THREE.Mesh(bodyGeo, mainMat);
+                bodyMesh.position.y = 0.1;
+                petGroup.add(bodyMesh);
+
+                const bellyGeo = new THREE.SphereGeometry(0.68, 20, 20);
+                bellyGeo.scale(0.85, 0.95, 0.4);
+                const bellyMesh = new THREE.Mesh(bellyGeo, bellyMat);
+                bellyMesh.position.set(0, 0.05, 0.72);
+                petGroup.add(bellyMesh);
+
+                // Head
                 const headGeo = new THREE.SphereGeometry(0.82, 24, 24);
                 const headMesh = new THREE.Mesh(headGeo, mainMat);
                 headMesh.position.set(0, 1.1, 0.1);
                 headMesh.name = "head";
                 petGroup.add(headMesh);
 
-                // 3D Eyes
-                const eyeGeo = new THREE.SphereGeometry(0.12, 16, 16);
-                const leftEye = new THREE.Mesh(eyeGeo, darkMat);
-                leftEye.position.set(-0.28, 1.18, 0.8);
-                const rightEye = new THREE.Mesh(eyeGeo, darkMat);
-                rightEye.position.set(0.28, 1.18, 0.8);
+                // Short Snout & Front Buck Teeth
+                const snoutGeo = new THREE.SphereGeometry(0.15, 16, 16);
+                snoutGeo.scale(1.1, 0.8, 0.8);
+                const snoutMesh = new THREE.Mesh(snoutGeo, bellyMat);
+                snoutMesh.position.set(0, 1.02, 0.78);
+                petGroup.add(snoutMesh);
 
-                const pupilGeo = new THREE.SphereGeometry(0.04, 12, 12);
-                const leftPupil = new THREE.Mesh(pupilGeo, whiteMat);
-                leftPupil.position.set(-0.26, 1.22, 0.9);
-                const rightPupil = new THREE.Mesh(pupilGeo, whiteMat);
-                rightPupil.position.set(0.30, 1.22, 0.9);
-
-                petGroup.add(leftEye);
-                petGroup.add(rightEye);
-                petGroup.add(leftPupil);
-                petGroup.add(rightPupil);
-
-                // 3D Nose/Muzzle
-                const noseGeo = new THREE.SphereGeometry(0.06, 12, 12);
-                const noseMesh = new THREE.Mesh(noseGeo, darkMat);
-                noseMesh.position.set(0, 1.05, 0.9);
+                const noseGeo = new THREE.SphereGeometry(0.05, 12, 12);
+                const noseMesh = new THREE.Mesh(noseGeo, pinkMat);
+                noseMesh.position.set(0, 1.08, 0.88);
                 petGroup.add(noseMesh);
 
-                // 3D Arms (Left & Right)
-                const armGeo = new THREE.CylinderGeometry(0.16, 0.12, 0.7, 12);
-                const leftArm = new THREE.Mesh(armGeo, mainMat);
-                leftArm.position.set(-0.9, 0.25, 0.1);
-                leftArm.rotation.z = 0.4;
-                leftArm.name = "leftArm";
+                // Two Small White Buck Teeth
+                const toothGeo = new THREE.BoxGeometry(0.04, 0.08, 0.02);
+                const leftTooth = new THREE.Mesh(toothGeo, whiteMat); leftTooth.position.set(-0.025, 0.96, 0.88);
+                const rightTooth = new THREE.Mesh(toothGeo, whiteMat); rightTooth.position.set(0.025, 0.96, 0.88);
+                petGroup.add(leftTooth); petGroup.add(rightTooth);
 
-                const rightArm = new THREE.Mesh(armGeo, mainMat);
-                rightArm.position.set(0.9, 0.25, 0.1);
-                rightArm.rotation.z = -0.4;
-                rightArm.name = "rightArm";
+                // Round Bunny Eyes
+                const eyeGeo = new THREE.SphereGeometry(0.12, 16, 16);
+                const leftEye = new THREE.Mesh(eyeGeo, darkMat); leftEye.position.set(-0.28, 1.18, 0.8);
+                const rightEye = new THREE.Mesh(eyeGeo, darkMat); rightEye.position.set(0.28, 1.18, 0.8);
 
-                petGroup.add(leftArm);
-                petGroup.add(rightArm);
+                const pupilGeo = new THREE.SphereGeometry(0.04, 12, 12);
+                const leftPupil = new THREE.Mesh(pupilGeo, whiteMat); leftPupil.position.set(-0.26, 1.22, 0.9);
+                const rightPupil = new THREE.Mesh(pupilGeo, whiteMat); rightPupil.position.set(0.30, 1.22, 0.9);
 
-                // 3D Legs
-                const legGeo = new THREE.SphereGeometry(0.3, 16, 16);
-                legGeo.scale(0.8, 1.2, 1.4);
-                const leftLeg = new THREE.Mesh(legGeo, mainMat);
-                leftLeg.position.set(-0.55, -0.85, 0.2);
+                petGroup.add(leftEye); petGroup.add(rightEye);
+                petGroup.add(leftPupil); petGroup.add(rightPupil);
 
-                const rightLeg = new THREE.Mesh(legGeo, mainMat);
-                rightLeg.position.set(0.55, -0.85, 0.2);
+                // Tall Ears
+                const earGeo = new THREE.CylinderGeometry(0.09, 0.18, 1.6, 14);
+                const leftEar = new THREE.Mesh(earGeo, secMat); leftEar.position.set(-0.35, 2.25, 0.0); leftEar.rotation.z = -0.15;
+                const rightEar = new THREE.Mesh(earGeo, secMat); rightEar.position.set(0.35, 2.25, 0.0); rightEar.rotation.z = 0.15;
+                petGroup.add(leftEar); petGroup.add(rightEar);
 
-                petGroup.add(leftLeg);
-                petGroup.add(rightLeg);
+                // Round Cotton Ball Tail
+                const tailGeo = new THREE.SphereGeometry(0.22, 16, 16);
+                const tailMesh = new THREE.Mesh(tailGeo, whiteMat);
+                tailMesh.position.set(0, -0.3, -0.85);
+                tailMesh.name = "tail";
+                petGroup.add(tailMesh);
 
-                // =========================================
-                // SPECIES-SPECIFIC 3D ANATOMICAL FEATURES
-                // =========================================
-                if (currentSpecies === 'cat' || currentSpecies === 'fox') {
-                    // Pointed Ears
-                    const earGeo = new THREE.ConeGeometry(0.28, 0.6, 12);
-                    const leftEar = new THREE.Mesh(earGeo, secMat);
-                    leftEar.position.set(-0.45, 1.8, 0.1);
-                    leftEar.rotation.z = -0.3;
+                // Small Front Paws & LARGE HIND HAUNCHES (Asymmetric Proportions)
+                const frontArmGeo = new THREE.CylinderGeometry(0.1, 0.08, 0.45, 12);
+                const leftArm = new THREE.Mesh(frontArmGeo, mainMat); leftArm.position.set(-0.65, 0.1, 0.4); leftArm.rotation.x = 0.5; leftArm.name = "leftArm";
+                const rightArm = new THREE.Mesh(frontArmGeo, mainMat); rightArm.position.set(0.65, 0.1, 0.4); rightArm.rotation.x = 0.5; rightArm.name = "rightArm";
+                petGroup.add(leftArm); petGroup.add(rightArm);
 
-                    const rightEar = new THREE.Mesh(earGeo, secMat);
-                    rightEar.position.set(0.45, 1.8, 0.1);
-                    rightEar.rotation.z = 0.3;
+                const hindLegGeo = new THREE.SphereGeometry(0.42, 20, 20);
+                hindLegGeo.scale(0.85, 1.35, 1.6);
+                const leftLeg = new THREE.Mesh(hindLegGeo, mainMat); leftLeg.position.set(-0.65, -0.75, 0.1);
+                const rightLeg = new THREE.Mesh(hindLegGeo, mainMat); rightLeg.position.set(0.65, -0.75, 0.1);
+                petGroup.add(leftLeg); petGroup.add(rightLeg);
 
-                    petGroup.add(leftEar);
-                    petGroup.add(rightEar);
+                // Stage 6+ Glowing Carrot Charm Accessory (Fixes Stage 6+ Parity Gap)
+                if (currentStage >= 6) {
+                    const carrotGeo = new THREE.ConeGeometry(0.14, 0.6, 12);
+                    const carrotMat = new THREE.MeshToonMaterial({ color: 0xf97316 });
+                    const carrotMesh = new THREE.Mesh(carrotGeo, carrotMat);
+                    carrotMesh.position.set(0.85, 0.2, 0.3);
+                    carrotMesh.rotation.z = -0.5;
+                    petGroup.add(carrotMesh);
 
-                    // 3D Tail
-                    const tailGeo = new THREE.CylinderGeometry(0.08, 0.22, 1.2, 12);
-                    const tailMesh = new THREE.Mesh(tailGeo, secMat);
-                    tailMesh.position.set(0, -0.2, -0.9);
-                    tailMesh.rotation.x = -0.8;
-                    tailMesh.name = "tail";
-                    petGroup.add(tailMesh);
-                } else if (currentSpecies === 'dog' || currentSpecies === 'koala') {
-                    // Fluffy Round Ears
-                    const earGeo = new THREE.SphereGeometry(0.35, 16, 16);
-                    earGeo.scale(1.2, 1.0, 0.4);
-                    const leftEar = new THREE.Mesh(earGeo, secMat);
-                    leftEar.position.set(-0.85, 1.45, 0.0);
-
-                    const rightEar = new THREE.Mesh(earGeo, secMat);
-                    rightEar.position.set(0.85, 1.45, 0.0);
-
-                    petGroup.add(leftEar);
-                    petGroup.add(rightEar);
-                } else if (currentSpecies === 'bunny') {
-                    // 3D Extra Tall Bunny Ears
-                    const earGeo = new THREE.CylinderGeometry(0.1, 0.18, 1.5, 12);
-                    const leftEar = new THREE.Mesh(earGeo, secMat);
-                    leftEar.position.set(-0.35, 2.2, 0.0);
-                    leftEar.rotation.z = -0.15;
-
-                    const rightEar = new THREE.Mesh(earGeo, secMat);
-                    rightEar.position.set(0.35, 2.2, 0.0);
-                    rightEar.rotation.z = 0.15;
-
-                    petGroup.add(leftEar);
-                    petGroup.add(rightEar);
-                } else if (currentSpecies === 'panda') {
-                    // Round Panda Ears & Eye Patches
-                    const earGeo = new THREE.SphereGeometry(0.25, 16, 16);
-                    const leftEar = new THREE.Mesh(earGeo, darkMat);
-                    leftEar.position.set(-0.6, 1.7, 0.0);
-
-                    const rightEar = new THREE.Mesh(earGeo, darkMat);
-                    rightEar.position.set(0.6, 1.7, 0.0);
-
-                    petGroup.add(leftEar);
-                    petGroup.add(rightEar);
+                    const leafGeo = new THREE.ConeGeometry(0.08, 0.25, 8);
+                    const leafMat = new THREE.MeshToonMaterial({ color: 0x22c55e });
+                    const leafMesh = new THREE.Mesh(leafGeo, leafMat);
+                    leafMesh.position.set(0.98, 0.45, 0.3);
+                    petGroup.add(leafMesh);
                 }
+            }
 
-                // =========================================
-                // 10-STAGE EVOLUTION MESH ACCESSORIES
-                // =========================================
+            // ---------------------------------------------------------
+            // 🐼 5. PANDA MESH BUILDER (Bao - Chunky, Black Eye Patches, Two-Tone Limbs)
+            // ---------------------------------------------------------
+            function buildPandaMesh(mainMat, secMat, bellyMat, darkMat, whiteMat, pinkMat, armorMat) {
+                // Chunky Round Torso (White Body)
+                const bodyGeo = new THREE.SphereGeometry(1.15, 24, 24);
+                bodyGeo.scale(1.1, 1.1, 1.05);
+                const bodyMesh = new THREE.Mesh(bodyGeo, whiteMat);
+                bodyMesh.position.y = 0.1;
+                petGroup.add(bodyMesh);
+
+                const bellyGeo = new THREE.SphereGeometry(0.75, 20, 20);
+                bellyGeo.scale(0.9, 0.95, 0.4);
+                const bellyMesh = new THREE.Mesh(bellyGeo, bellyMat);
+                bellyMesh.position.set(0, 0.05, 0.82);
+                petGroup.add(bellyMesh);
+
+                // Round White Head
+                const headGeo = new THREE.SphereGeometry(0.88, 24, 24);
+                const headMesh = new THREE.Mesh(headGeo, whiteMat);
+                headMesh.position.set(0, 1.1, 0.1);
+                headMesh.name = "head";
+                petGroup.add(headMesh);
+
+                // DISTINCTIVE BLACK EYE PATCHES
+                const patchGeo = new THREE.SphereGeometry(0.2, 16, 16);
+                patchGeo.scale(1.2, 0.95, 0.3);
+                const leftPatch = new THREE.Mesh(patchGeo, darkMat);
+                leftPatch.position.set(-0.28, 1.18, 0.82);
+                leftPatch.rotation.z = -0.25;
+
+                const rightPatch = new THREE.Mesh(patchGeo, darkMat);
+                rightPatch.position.set(0.28, 1.18, 0.82);
+                rightPatch.rotation.z = 0.25;
+
+                petGroup.add(leftPatch); petGroup.add(rightPatch);
+
+                // Eyes inside Patches
+                const eyeGeo = new THREE.SphereGeometry(0.07, 12, 12);
+                const leftEye = new THREE.Mesh(eyeGeo, whiteMat); leftEye.position.set(-0.28, 1.18, 0.88);
+                const rightEye = new THREE.Mesh(eyeGeo, whiteMat); rightEye.position.set(0.28, 1.18, 0.88);
+
+                const pupilGeo = new THREE.SphereGeometry(0.04, 12, 12);
+                const leftPupil = new THREE.Mesh(pupilGeo, darkMat); leftPupil.position.set(-0.27, 1.19, 0.94);
+                const rightPupil = new THREE.Mesh(pupilGeo, darkMat); rightPupil.position.set(0.29, 1.19, 0.94);
+
+                petGroup.add(leftEye); petGroup.add(rightEye);
+                petGroup.add(leftPupil); petGroup.add(rightPupil);
+
+                // Stubby Flat Snout
+                const snoutGeo = new THREE.SphereGeometry(0.16, 16, 16);
+                snoutGeo.scale(1.3, 0.7, 0.6);
+                const snoutMesh = new THREE.Mesh(snoutGeo, whiteMat);
+                snoutMesh.position.set(0, 1.02, 0.85);
+                petGroup.add(snoutMesh);
+
+                const noseGeo = new THREE.SphereGeometry(0.07, 12, 12);
+                const noseMesh = new THREE.Mesh(noseGeo, darkMat);
+                noseMesh.position.set(0, 1.06, 0.94);
+                petGroup.add(noseMesh);
+
+                // Round Dark Ears
+                const earGeo = new THREE.SphereGeometry(0.26, 16, 16);
+                const leftEar = new THREE.Mesh(earGeo, darkMat); leftEar.position.set(-0.62, 1.72, 0.0);
+                const rightEar = new THREE.Mesh(earGeo, darkMat); rightEar.position.set(0.62, 1.72, 0.0);
+                petGroup.add(leftEar); petGroup.add(rightEar);
+
+                // TWO-TONE BLACK LIMBS (Arms & Legs)
+                const armGeo = new THREE.CylinderGeometry(0.2, 0.15, 0.75, 12);
+                const leftArm = new THREE.Mesh(armGeo, darkMat); leftArm.position.set(-0.95, 0.25, 0.1); leftArm.rotation.z = 0.4; leftArm.name = "leftArm";
+                const rightArm = new THREE.Mesh(armGeo, darkMat); rightArm.position.set(0.95, 0.25, 0.1); rightArm.rotation.z = -0.4; rightArm.name = "rightArm";
+                petGroup.add(leftArm); petGroup.add(rightArm);
+
+                const legGeo = new THREE.SphereGeometry(0.35, 16, 16);
+                legGeo.scale(0.85, 1.2, 1.4);
+                const leftLeg = new THREE.Mesh(legGeo, darkMat); leftLeg.position.set(-0.6, -0.85, 0.2);
+                const rightLeg = new THREE.Mesh(legGeo, darkMat); rightLeg.position.set(0.6, -0.85, 0.2);
+                petGroup.add(leftLeg); petGroup.add(rightLeg);
+
+                // Stage 6+ Bamboo Staff
+                if (currentStage >= 6) {
+                    const bStaffGeo = new THREE.CylinderGeometry(0.05, 0.05, 2.2, 12);
+                    const bStaffMat = new THREE.MeshToonMaterial({ color: 0x22c55e });
+                    const bStaff = new THREE.Mesh(bStaffGeo, bStaffMat);
+                    bStaff.position.set(0.95, 0.2, 0.3);
+                    petGroup.add(bStaff);
+                }
+            }
+
+            // ---------------------------------------------------------
+            // 🐨 6. KOALA MESH BUILDER (Koko - Low Build, Oversized Nose, Fluffy Ear Tufts)
+            // ---------------------------------------------------------
+            function buildKoalaMesh(mainMat, secMat, bellyMat, darkMat, whiteMat, pinkMat, armorMat) {
+                // Stocky Low-Slung Torso
+                const bodyGeo = new THREE.SphereGeometry(1.05, 24, 24);
+                bodyGeo.scale(1.05, 0.95, 1.05);
+                const bodyMesh = new THREE.Mesh(bodyGeo, mainMat);
+                bodyMesh.position.y = 0.05;
+                petGroup.add(bodyMesh);
+
+                const bellyGeo = new THREE.SphereGeometry(0.7, 20, 20);
+                bellyGeo.scale(0.88, 0.9, 0.4);
+                const bellyMesh = new THREE.Mesh(bellyGeo, bellyMat);
+                bellyMesh.position.set(0, 0.0, 0.78);
+                petGroup.add(bellyMesh);
+
+                // Broad Round Head
+                const headGeo = new THREE.SphereGeometry(0.88, 24, 24);
+                headGeo.scale(1.05, 0.92, 1.0);
+                const headMesh = new THREE.Mesh(headGeo, mainMat);
+                headMesh.position.set(0, 1.05, 0.1);
+                headMesh.name = "head";
+                petGroup.add(headMesh);
+
+                // OVERSIZED ROUND BLACK NOSE (Koala Signature)
+                const noseGeo = new THREE.SphereGeometry(0.2, 16, 16);
+                noseGeo.scale(0.9, 1.4, 0.8);
+                const noseMesh = new THREE.Mesh(noseGeo, darkMat);
+                noseMesh.position.set(0, 1.02, 0.92);
+                petGroup.add(noseMesh);
+
+                // Friendly Eyes
+                const eyeGeo = new THREE.SphereGeometry(0.1, 16, 16);
+                const leftEye = new THREE.Mesh(eyeGeo, darkMat); leftEye.position.set(-0.32, 1.18, 0.8);
+                const rightEye = new THREE.Mesh(eyeGeo, darkMat); rightEye.position.set(0.32, 1.18, 0.8);
+
+                const pupilGeo = new THREE.SphereGeometry(0.035, 12, 12);
+                const leftPupil = new THREE.Mesh(pupilGeo, whiteMat); leftPupil.position.set(-0.3, 1.2, 0.88);
+                const rightPupil = new THREE.Mesh(pupilGeo, whiteMat); rightPupil.position.set(0.34, 1.2, 0.88);
+
+                petGroup.add(leftEye); petGroup.add(rightEye);
+                petGroup.add(leftPupil); petGroup.add(rightPupil);
+
+                // LARGE FLUFFY EAR TUFTS
+                const earGeo = new THREE.SphereGeometry(0.42, 16, 16);
+                earGeo.scale(1.1, 1.0, 0.35);
+                const leftEar = new THREE.Mesh(earGeo, secMat); leftEar.position.set(-0.85, 1.5, 0.05); leftEar.rotation.z = -0.2;
+                const rightEar = new THREE.Mesh(earGeo, secMat); rightEar.position.set(0.85, 1.5, 0.05); rightEar.rotation.z = 0.2;
+
+                const tuftGeo = new THREE.SphereGeometry(0.26, 12, 12);
+                tuftGeo.scale(1.0, 1.0, 0.3);
+                const leftTuft = new THREE.Mesh(tuftGeo, whiteMat); leftTuft.position.set(-0.85, 1.5, 0.12);
+                const rightTuft = new THREE.Mesh(tuftGeo, whiteMat); rightTuft.position.set(0.85, 1.5, 0.12);
+
+                petGroup.add(leftEar); petGroup.add(rightEar);
+                petGroup.add(leftTuft); petGroup.add(rightTuft);
+
+                // Short Compact Limbs
+                const armGeo = new THREE.CylinderGeometry(0.16, 0.12, 0.55, 12);
+                const leftArm = new THREE.Mesh(armGeo, mainMat); leftArm.position.set(-0.85, 0.15, 0.1); leftArm.rotation.z = 0.45; leftArm.name = "leftArm";
+                const rightArm = new THREE.Mesh(armGeo, mainMat); rightArm.position.set(0.85, 0.15, 0.1); rightArm.rotation.z = -0.45; rightArm.name = "rightArm";
+                petGroup.add(leftArm); petGroup.add(rightArm);
+
+                const legGeo = new THREE.SphereGeometry(0.3, 16, 16);
+                legGeo.scale(0.8, 1.1, 1.3);
+                const leftLeg = new THREE.Mesh(legGeo, mainMat); leftLeg.position.set(-0.55, -0.8, 0.18);
+                const rightLeg = new THREE.Mesh(legGeo, mainMat); rightLeg.position.set(0.55, -0.8, 0.18);
+                petGroup.add(leftLeg); petGroup.add(rightLeg);
+
+                // Stage 6+ Eucalyptus Branch Accessory (Fixes Stage 6+ Parity Gap)
+                if (currentStage >= 6) {
+                    const eBranchGeo = new THREE.CylinderGeometry(0.04, 0.05, 1.4, 10);
+                    const eBranchMat = new THREE.MeshToonMaterial({ color: 0x15803d });
+                    const eBranch = new THREE.Mesh(eBranchGeo, eBranchMat);
+                    eBranch.position.set(0.85, 0.3, 0.3); eBranch.rotation.z = -0.4;
+                    petGroup.add(eBranch);
+                }
+            }
+
+            // ---------------------------------------------------------
+            // UNIVERSAL STAGE ACCESSORIES (Stage 2 - 10)
+            // ---------------------------------------------------------
+            function buildUniversalAccessories(mainMat, secMat, bellyMat, goldMat, darkMat, whiteMat, armorMat, crystalMat) {
                 // Stage 2+: Scarf / Collar
                 if (currentStage >= 2) {
                     const scarfGeo = new THREE.TorusGeometry(0.62, 0.09, 12, 24);
@@ -378,71 +862,16 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                     petGroup.add(crownMesh);
                 }
 
-                // Stage 6+: Species-Specific 3D Weapons & Features
-                if (currentStage >= 6) {
-                    if (currentSpecies === 'dog') {
-                        // Dual Shoulder Hydro Cannons (Blastoise)
-                        const cannonGeo = new THREE.CylinderGeometry(0.12, 0.16, 0.9, 12);
-                        const leftCannon = new THREE.Mesh(cannonGeo, armorMat);
-                        leftCannon.position.set(-0.7, 0.7, -0.3);
-                        leftCannon.rotation.x = -0.4;
-
-                        const rightCannon = new THREE.Mesh(cannonGeo, armorMat);
-                        rightCannon.position.set(0.7, 0.7, -0.3);
-                        rightCannon.rotation.x = -0.4;
-
-                        petGroup.add(leftCannon);
-                        petGroup.add(rightCannon);
-                    } else if (currentSpecies === 'cat') {
-                        // Dual Fiery Horns (Charizard)
-                        const hornGeo = new THREE.ConeGeometry(0.12, 0.5, 12);
-                        const hornMat = new THREE.MeshToonMaterial({ color: 0xef4444 });
-                        const leftHorn = new THREE.Mesh(hornGeo, hornMat);
-                        leftHorn.position.set(-0.35, 1.85, 0.1);
-                        leftHorn.rotation.z = -0.4;
-
-                        const rightHorn = new THREE.Mesh(hornGeo, hornMat);
-                        rightHorn.position.set(0.35, 1.85, 0.1);
-                        rightHorn.rotation.z = 0.4;
-
-                        petGroup.add(leftHorn);
-                        petGroup.add(rightHorn);
-                    } else if (currentSpecies === 'fox') {
-                        // 6 3D Kitsune Tails
-                        for (let t = -3; t <= 3; t++) {
-                            if (t === 0) continue;
-                            const kTailGeo = new THREE.CylinderGeometry(0.06, 0.18, 1.3, 12);
-                            const kTailMesh = new THREE.Mesh(kTailGeo, secMat);
-                            kTailMesh.position.set(t * 0.22, -0.1, -0.85);
-                            kTailMesh.rotation.x = -0.9;
-                            kTailMesh.rotation.z = t * 0.25;
-                            petGroup.add(kTailMesh);
-                        }
-                    } else if (currentSpecies === 'panda') {
-                        // Bamboo Martial Staff
-                        const bStaffGeo = new THREE.CylinderGeometry(0.05, 0.05, 2.2, 12);
-                        const bStaffMat = new THREE.MeshToonMaterial({ color: 0x22c55e });
-                        const bStaff = new THREE.Mesh(bStaffGeo, bStaffMat);
-                        bStaff.position.set(0.95, 0.2, 0.3);
-                        petGroup.add(bStaff);
-                    }
-                }
-
                 // Stage 7+: 3D Dragon Wings
                 if (currentStage >= 7) {
                     const wingGeo = new THREE.BoxGeometry(1.6, 0.7, 0.05);
                     const leftWing = new THREE.Mesh(wingGeo, armorMat);
-                    leftWing.position.set(-1.4, 0.6, -0.5);
-                    leftWing.rotation.y = 0.5;
-                    leftWing.rotation.z = 0.3;
+                    leftWing.position.set(-1.4, 0.6, -0.5); leftWing.rotation.y = 0.5; leftWing.rotation.z = 0.3;
 
                     const rightWing = new THREE.Mesh(wingGeo, armorMat);
-                    rightWing.position.set(1.4, 0.6, -0.5);
-                    rightWing.rotation.y = -0.5;
-                    rightWing.rotation.z = -0.3;
+                    rightWing.position.set(1.4, 0.6, -0.5); rightWing.rotation.y = -0.5; rightWing.rotation.z = -0.3;
 
-                    petGroup.add(leftWing);
-                    petGroup.add(rightWing);
+                    petGroup.add(leftWing); petGroup.add(rightWing);
                 }
 
                 // Stage 8+: Arcane Staff with Crystal Orb
@@ -455,8 +884,7 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                     const orbMesh = new THREE.Mesh(orbGeo, crystalMat);
                     orbMesh.position.set(1.2, 1.6, 0.4);
 
-                    petGroup.add(staffMesh);
-                    petGroup.add(orbMesh);
+                    petGroup.add(staffMesh); petGroup.add(orbMesh);
                 }
 
                 // Stage 9+: Divine Floating Halo Ring
@@ -476,8 +904,6 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                     auraMesh.position.set(0, 0.5, 0);
                     auraGroup.add(auraMesh);
                 }
-
-                build3DParticles();
             }
 
             // =========================================================
@@ -550,8 +976,13 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                 petGroup.rotation.y += (targetRotationY - petGroup.rotation.y) * 0.12;
                 petGroup.rotation.x += (targetRotationX - petGroup.rotation.x) * 0.12;
 
-                // 3D Breathing & Hop Animation
+                // 3D Breathing & Per-Species Idle Animation
                 let bounceY = Math.sin(time * 2.2) * 0.08;
+
+                // Bunny Hop Idle Accent
+                if (currentSpecies === 'bunny' && !isHopping) {
+                    bounceY += Math.abs(Math.sin(time * 3.5)) * 0.08;
+                }
 
                 if (isHopping) {
                     hopProgress += 0.06;
@@ -567,6 +998,13 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
 
                 petGroup.position.y = bounceY;
 
+                // Panda Side-to-Side Rock/Sway
+                if (currentSpecies === 'panda' && !isDragging) {
+                    petGroup.rotation.z = Math.sin(time * 1.2) * 0.04;
+                } else if (!isDragging) {
+                    petGroup.rotation.z = 0;
+                }
+
                 // Dynamic Ground Shadow Scaling
                 const shadow = petGroup.getObjectByName("shadow");
                 if (shadow) {
@@ -576,7 +1014,13 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
 
                 const head = petGroup.getObjectByName("head");
                 if (head) {
-                    head.rotation.z = Math.sin(time * 1.5) * 0.06;
+                    // Koala Sleepy Doze Head-Nod
+                    if (currentSpecies === 'koala') {
+                        head.rotation.x = Math.sin(time * 1.5) * 0.12;
+                        head.rotation.z = Math.sin(time * 1.0) * 0.04;
+                    } else {
+                        head.rotation.z = Math.sin(time * 1.5) * 0.06;
+                    }
                 }
 
                 const leftArm = petGroup.getObjectByName("leftArm");
@@ -586,9 +1030,27 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                     rightArm.rotation.x = -Math.sin(time * 2.0) * 0.2;
                 }
 
+                // Fox Ear Swivel Animation
+                const leftEar = petGroup.getObjectByName("leftEar");
+                const rightEar = petGroup.getObjectByName("rightEar");
+                if (currentSpecies === 'fox' && leftEar && rightEar) {
+                    leftEar.rotation.x = Math.sin(time * 4.0) * 0.15;
+                    rightEar.rotation.x = -Math.sin(time * 4.0) * 0.15;
+                }
+
+                // Tail Animations (Dog Wag vs Cat/Fox Tail Flick)
                 const tail = petGroup.getObjectByName("tail");
                 if (tail) {
-                    tail.rotation.y = Math.sin(time * 3.0) * 0.3;
+                    if (currentSpecies === 'dog') {
+                        // Fast Happy Tail Wag
+                        const isHappy = currentEmotion === 'happy' || currentEmotion === 'excited';
+                        const wagSpeed = isHappy ? 14.0 : 6.0;
+                        const wagAmp = isHappy ? 0.45 : 0.25;
+                        tail.rotation.z = Math.sin(time * wagSpeed) * wagAmp;
+                    } else {
+                        // Gentle Tail Oscillation
+                        tail.rotation.y = Math.sin(time * 3.0) * 0.3;
+                    }
                 }
 
                 // Stage 10 Aura rotation
