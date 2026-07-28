@@ -1124,12 +1124,17 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
 
                 const head = petGroup.getObjectByName("head");
                 if (head) {
-                    // Koala Sleepy Doze Head-Nod
-                    if (currentSpecies === 'koala') {
+                    if (isDragging) {
+                        head.rotation.y = (targetRotationY - petGroup.rotation.y) * 0.35;
+                        head.rotation.x = (targetRotationX - petGroup.rotation.x) * 0.35;
+                    } else if (currentSpecies === 'koala') {
                         head.rotation.x = Math.sin(time * 1.5) * 0.12;
                         head.rotation.z = Math.sin(time * 1.0) * 0.04;
+                        head.rotation.y = 0;
                     } else {
                         head.rotation.z = Math.sin(time * 1.5) * 0.06;
+                        head.rotation.x = 0;
+                        head.rotation.y = 0;
                     }
                 }
 
