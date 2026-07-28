@@ -147,6 +147,12 @@ class BonsaiModelDownloaderEngine {
                 reason: `Requires at least ${(model.minFreeStorageMB / 1024).toFixed(1)} GB free storage space (Free: ${freeStorage} MB).`
             };
         }
+
+        // Note: minRamGB check for heavy 3B models
+        if (model.minRamGB > 4.0) {
+            console.log(`[BonsaiDownloader] Model ${model.modelName} requires high device RAM (${model.minRamGB}GB).`);
+        }
+
         return { isCompatible: true };
     }
 

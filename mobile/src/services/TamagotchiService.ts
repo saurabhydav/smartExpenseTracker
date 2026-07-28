@@ -44,11 +44,12 @@ export function processTransactionGamification(
     return { expDelta, coinDelta, message };
 }
 
-// Update pet state with leveling and ghost state triggers (Steps 64 & 65)
+// Update pet state with leveling and ghost state triggers
 export function applyGamificationUpdate(expDelta: number, coinDelta: number): void {
     const store = useAppStore.getState();
-    const current = store.tamagotchi || {
+    const tamagotchi = store.tamagotchi || {
         petType: 'cat',
+        petsData: {},
         level: 1,
         exp: 0,
         coins: 100,
@@ -56,17 +57,34 @@ export function applyGamificationUpdate(expDelta: number, coinDelta: number): vo
         ghostState: false,
     };
 
-    let newLevel = current.level;
-    let newExp = current.exp + expDelta;
-    let newCoins = Math.max(0, current.coins + coinDelta);
-    let newGhostState = current.ghostState;
+    const currentPetId = tamagotchi.petType || 'cat';
+    const petsData = { ...(tamagotchi.petsData || {}) };
+    
+    const activePet = petsData[currentPetId] || {
+        level: tamagotchi.level || 1,
+        exp: tamagotchi.exp || 0,
+        coins: tamagotchi.coins || 100,
+        feedCount: 0,
+        playCount: 0,
+        specialCount: 0,
+    };
+
+    let newLevel = activePet.level;
+    let newExp = activePet.exp + expDelta;
+    let newCoins = Math.max(0, activePet.coins + coinDelta);
+    let newGhostState = tamagotchi.ghostState;
 
     // Level up check
     let required = getRequiredExp(newLevel);
-    while (newExp >= required) {
+    while (newExp >= required && newLevel < 10) {
         newExp -= required;
         newLevel += 1;
         required = getRequiredExp(newLevel);
+    }
+
+    if (newLevel >= 10) {
+        newLevel = 10;
+        newExp = Math.min(newExp, getRequiredExp(10));
     }
 
     // Ghost state trigger if EXP drops below -50
@@ -77,7 +95,15 @@ export function applyGamificationUpdate(expDelta: number, coinDelta: number): vo
         newExp = 0;
     }
 
+    petsData[currentPetId] = {
+        ...activePet,
+        level: newLevel,
+        exp: newExp,
+        coins: newCoins,
+    };
+
     store.updateTamagotchi({
+        petsData,
         level: newLevel,
         exp: newExp,
         coins: newCoins,

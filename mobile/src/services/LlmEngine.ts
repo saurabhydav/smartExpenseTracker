@@ -8,7 +8,6 @@ import RNFS from 'react-native-fs';
 type LlamaContext = Awaited<ReturnType<typeof initLlama>>;
 
 const MODEL_DIR = `${RNFS.DocumentDirectoryPath}/models`;
-const DEFAULT_MODEL_PATH = `${MODEL_DIR}/Bonsai-1.7B-Q1_0.gguf`;
 
 export interface LlmEngineStatus {
     loaded: boolean;
@@ -36,8 +35,8 @@ class LlmEngineService {
     /**
      * Load a GGUF model from device storage into memory using llama.cpp
      */
-    async loadModel(modelPath?: string): Promise<boolean> {
-        const path = modelPath || DEFAULT_MODEL_PATH;
+    async loadModel(modelPath: string): Promise<boolean> {
+        const path = modelPath;
 
         // Already loaded this model
         if (this.context && this.currentModelPath === path) {

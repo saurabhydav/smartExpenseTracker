@@ -6,12 +6,12 @@ import { colors } from '../utils';
 import { Pet3DCanvas } from './Pet3DCanvas';
 
 // ============================================
-// POKÉMON & DIGIMON EVOLUTION SPECIES DEFINITIONS
+// ORIGINAL ELEMENTAL PET SPECIES DEFINITIONS
 // ============================================
 export interface PetSpeciesDef {
     id: 'cat' | 'dog' | 'bunny' | 'panda' | 'fox' | 'koala';
     name: string;
-    pokemonClass: string;
+    elementalClass: string;
     emoji: string;
     speciality: string;
     specialAbilityName: string;
@@ -29,7 +29,7 @@ export interface PetSpeciesDef {
 export const SPECIES_CAT: PetSpeciesDef = {
     id: 'cat',
     name: 'Milo the Cat',
-    pokemonClass: 'Fire Dragon (Charizard Line)',
+    elementalClass: 'Inferno Pyrocat Sovereign',
     emoji: '🐱',
     speciality: 'Financial Stealth & Saver',
     specialAbilityName: 'Flamethrower Pounce',
@@ -51,14 +51,14 @@ export const SPECIES_CAT: PetSpeciesDef = {
         { level: 7, title: 'Solar Sekhmet', badge: '🦅 Stage 7 Dragon Wings', scale: 1.14 },
         { level: 8, title: 'Flare Dragon Sphinx', badge: '🔮 Stage 8 Arcane Staff', scale: 1.21 },
         { level: 9, title: 'Phoenix Bastet God', badge: '😇 Stage 9 Bastet Divine Halo', scale: 1.28 },
-        { level: 10, title: 'MEGA CHARIZARD CAT', badge: '🌌 Stage 10 WARGREYMON MEGA FORM', scale: 1.36 },
+        { level: 10, title: 'INFERNO PYROCAT SOVEREIGN', badge: '🌌 Stage 10 ELEMENTAL TITAN FORM', scale: 1.36 },
     ]
 };
 
 export const SPECIES_DOG: PetSpeciesDef = {
     id: 'dog',
     name: 'Buddy the Dog',
-    pokemonClass: 'Water Cannon Guard (Blastoise Line)',
+    elementalClass: 'Hydro Tidalhound Emperor',
     emoji: '🐶',
     speciality: 'Loyal Budget Guard',
     specialAbilityName: 'Hydro Cannon Bark',
@@ -80,14 +80,14 @@ export const SPECIES_DOG: PetSpeciesDef = {
         { level: 7, title: 'Tidal Valkyrie', badge: '🦅 Stage 7 Tidal Wings', scale: 1.14 },
         { level: 8, title: 'Cerberus Warden', badge: '🔮 Stage 8 Trident Staff', scale: 1.21 },
         { level: 9, title: 'Poseidon Monarch', badge: '😇 Stage 9 Sea Halo', scale: 1.28 },
-        { level: 10, title: 'MEGA BLASTOISE DOG', badge: '🌌 Stage 10 MEGA BLASTOISE FORM', scale: 1.36 },
+        { level: 10, title: 'HYDRO TIDALHOUND EMPEROR', badge: '🌌 Stage 10 OCEAN TITAN FORM', scale: 1.36 },
     ]
 };
 
 export const SPECIES_BUNNY: PetSpeciesDef = {
     id: 'bunny',
     name: 'Luna the Bunny',
-    pokemonClass: 'Electric Volt Runner (Raichu Line)',
+    elementalClass: 'Volt Stormhare Titan',
     emoji: '🐰',
     speciality: 'EXP Burst & Agility',
     specialAbilityName: 'Volt Tackle Hop',
@@ -109,14 +109,14 @@ export const SPECIES_BUNNY: PetSpeciesDef = {
         { level: 7, title: 'Astro Lapin', badge: '🦅 Stage 7 Plasma Wings', scale: 1.14 },
         { level: 8, title: 'Quantum Volt Rabbit', badge: '🔮 Stage 8 Volt Staff', scale: 1.21 },
         { level: 9, title: 'Eclipse Thunder God', badge: '😇 Stage 9 High-Volt Halo', scale: 1.28 },
-        { level: 10, title: 'MEGA RAICHU BUNNY', badge: '🌌 Stage 10 MEGA RAICHU FORM', scale: 1.36 },
+        { level: 10, title: 'VOLT STORMHARE TITAN', badge: '🌌 Stage 10 THUNDER TITAN FORM', scale: 1.36 },
     ]
 };
 
 export const SPECIES_PANDA: PetSpeciesDef = {
     id: 'panda',
     name: 'Bao the Panda',
-    pokemonClass: 'Earth Dragon Titan (Rayquaza Line)',
+    elementalClass: 'Jade Monarch Panda',
     emoji: '🐼',
     speciality: 'Zen Cash Balance',
     specialAbilityName: 'Dragon Zen Slam',
@@ -138,14 +138,14 @@ export const SPECIES_PANDA: PetSpeciesDef = {
         { level: 7, title: 'Earth Dragon Panda', badge: '🦅 Stage 7 Emerald Wings', scale: 1.14 },
         { level: 8, title: 'Lotus Sage Emperor', badge: '🔮 Stage 8 Lotus Staff', scale: 1.21 },
         { level: 9, title: 'Nirvana Emperor', badge: '😇 Stage 9 Nirvana Halo', scale: 1.28 },
-        { level: 10, title: 'MEGA RAYQUAZA PANDA', badge: '🌌 Stage 10 MEGA RAYQUAZA FORM', scale: 1.36 },
+        { level: 10, title: 'JADE MONARCH PANDA', badge: '🌌 Stage 10 EARTH TITAN FORM', scale: 1.36 },
     ]
 };
 
 export const SPECIES_FOX: PetSpeciesDef = {
     id: 'fox',
     name: 'Rusty the Fox',
-    pokemonClass: 'Kitsune Nine-Tails (Ninetales Line)',
+    elementalClass: 'Kitsune Celestial Fox',
     emoji: '🦊',
     speciality: 'Smart Cashback Finder',
     specialAbilityName: 'Kitsune Fire Blast',
@@ -167,14 +167,14 @@ export const SPECIES_FOX: PetSpeciesDef = {
         { level: 7, title: 'Spirit 9-Tail Fox', badge: '🦅 Stage 7 9 MAGNIFICENT TAILS', scale: 1.14 },
         { level: 8, title: 'Nine-Tailed Sage', badge: '🔮 Stage 8 Kitsune Orb Staff', scale: 1.21 },
         { level: 9, title: 'Celestial Inari', badge: '😇 Stage 9 Inari Divine Halo', scale: 1.28 },
-        { level: 10, title: 'MEGA NINETALES FOX', badge: '🌌 Stage 10 MEGA NINETALES FORM', scale: 1.36 },
+        { level: 10, title: 'KITSUNE CELESTIAL FOX', badge: '🌌 Stage 10 SPIRIT TITAN FORM', scale: 1.36 },
     ]
 };
 
 export const SPECIES_KOALA: PetSpeciesDef = {
     id: 'koala',
     name: 'Koko the Koala',
-    pokemonClass: 'Psychic Time Sovereign (Mewtwo Line)',
+    elementalClass: 'Astral Mystic Koala',
     emoji: '🐨',
     speciality: 'Compound Interest Nap',
     specialAbilityName: 'Psystrike Sleep',
@@ -196,7 +196,7 @@ export const SPECIES_KOALA: PetSpeciesDef = {
         { level: 7, title: 'Chrono Koala', badge: '🦅 Stage 7 Astral Wings', scale: 1.14 },
         { level: 8, title: 'Time-Lord Sovereign', badge: '🔮 Stage 8 Psychic Orb Staff', scale: 1.21 },
         { level: 9, title: 'Eternal Dream God', badge: '😇 Stage 9 Astral Halo', scale: 1.28 },
-        { level: 10, title: 'MEGA MEWTWO KOALA', badge: '🌌 Stage 10 MEGA MEWTWO FORM', scale: 1.36 },
+        { level: 10, title: 'ASTRAL MYSTIC KOALA', badge: '🌌 Stage 10 COSMIC TITAN FORM', scale: 1.36 },
     ]
 };
 
@@ -213,7 +213,7 @@ const DIALOG_QUOTES = [
     "Great job tracking your expenses today! 🌟",
     "You're staying well under budget this month! 💪",
     "Did you know? Saving 10% daily adds up fast! 💰",
-    "Tap my Special Ability to trigger my Pokémon Power! ⚡",
+    "Tap my Special Ability to activate my Elemental Power! ⚡",
     "I'm feeling super energized today! ✨",
     "Remember to log your recent coffee purchase! ☕",
     "Your financial health score is looking strong! 📈",

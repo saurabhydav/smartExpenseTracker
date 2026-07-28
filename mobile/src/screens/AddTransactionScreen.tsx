@@ -16,6 +16,7 @@ import { useAppStore } from '../store';
 import { insertTransaction, getCategories } from '../database';
 import { colors } from '../utils';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { processTransactionGamification, applyGamificationUpdate } from '../services/TamagotchiService';
 
 interface AddTransactionScreenProps {
     navigation: any;
@@ -64,6 +65,11 @@ export default function AddTransactionScreen({ navigation }: AddTransactionScree
                 notes: notes.trim() || null,
                 originalMerchant: null,
             }, false); // Allow duplicates for manual entries
+
+            // Process Pet Gamification
+            const catName = selectedCategoryData ? selectedCategoryData.name : 'General';
+            const gamification = processTransactionGamification(type, parsedAmount, catName, false);
+            applyGamificationUpdate(gamification.expDelta, gamification.coinDelta);
 
             await refreshAll();
             navigation.goBack();

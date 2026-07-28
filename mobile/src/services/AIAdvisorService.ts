@@ -757,7 +757,8 @@ export async function getSpendingAnswer(userId: number, question: string): Promi
             `• **Total Outflow**: **${formatCurrency(totalSpent)}** (${txnCount} transactions logged).`,
             `• **Active Budget**: **${formatCurrency(totalBudget)}** | Net Surplus: **${formatCurrency(netSaved)}**.`,
             `• **Current Velocity**: **${formatCurrency(dailyAvg)}/day** | Projected EOM: **${formatCurrency(projectedTotal)}**.`,
-            `💡 **Financial Assistant Summary**\nMaintain a target daily spend under **${daysLeft > 0 ? formatCurrency(Math.max(0, totalBudget - totalSpent) / daysLeft) : formatCurrency(0)}** for the remaining **${daysLeft} days** of the month to maximize net savings.`
+            `💡 **Financial Assistant Summary**\nMaintain a target daily spend under **${daysLeft > 0 ? formatCurrency(Math.max(0, totalBudget - totalSpent) / daysLeft) : formatCurrency(0)}** for the remaining **${daysLeft} days** of the month to maximize net savings.`,
+            `ℹ️ *This automated summary is for expense tracking only and does not constitute financial advice.*`
         ].join('\n\n');
 
     } catch (error) {
