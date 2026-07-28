@@ -225,17 +225,29 @@ export const BonsaiModelCard: React.FC<BonsaiModelCardProps> = ({
                 )}
 
                 {status === 'DOWNLOADING' && (
-                    <TouchableOpacity style={styles.secondaryButton} onPress={handlePauseDownload}>
-                        <Icon name="pause" size={18} color={colors.primary} />
-                        <Text style={styles.secondaryButtonText}>Pause Download</Text>
-                    </TouchableOpacity>
+                    <View style={styles.actionRow}>
+                        <TouchableOpacity style={[styles.secondaryButton, { flex: 1 }]} onPress={handlePauseDownload}>
+                            <Icon name="pause" size={18} color={colors.primary} />
+                            <Text style={styles.secondaryButtonText}>Pause Download</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteModel}>
+                            <Icon name="delete-outline" size={16} color="#ef4444" />
+                            <Text style={styles.deleteText}>Delete</Text>
+                        </TouchableOpacity>
+                    </View>
                 )}
 
                 {status === 'PAUSED' && (
-                    <TouchableOpacity style={styles.primaryButton} onPress={handleStartDownload}>
-                        <Icon name="play-arrow" size={18} color="#fff" />
-                        <Text style={styles.buttonText}>Resume Download</Text>
-                    </TouchableOpacity>
+                    <View style={styles.actionRow}>
+                        <TouchableOpacity style={[styles.primaryButton, { flex: 1 }]} onPress={handleStartDownload}>
+                            <Icon name="play-arrow" size={18} color="#fff" />
+                            <Text style={styles.buttonText}>Resume Download</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteModel}>
+                            <Icon name="delete-outline" size={16} color="#ef4444" />
+                            <Text style={styles.deleteText}>Delete</Text>
+                        </TouchableOpacity>
+                    </View>
                 )}
 
                 {status === 'READY' && !isLoaded && (
@@ -475,6 +487,11 @@ const styles = StyleSheet.create({
         color: colors.primary,
         fontWeight: '600',
         fontSize: 14,
+    },
+    actionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
     },
     loadedActions: {
         flexDirection: 'row',
