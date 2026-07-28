@@ -281,7 +281,7 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                 headMesh.name = "head";
                 petGroup.add(headMesh);
 
-                // Almond Eyes & Pupils
+                // Almond Eyes & Pupils with Glossy Catchlights
                 const eyeGeo = new THREE.SphereGeometry(0.12, 16, 16);
                 eyeGeo.scale(1.1, 0.9, 0.8);
                 const leftEye = new THREE.Mesh(eyeGeo, darkMat);
@@ -292,14 +292,33 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                 rightEye.position.set(0.28, 1.18, 0.78);
                 rightEye.rotation.z = 0.15;
 
-                const pupilGeo = new THREE.SphereGeometry(0.04, 12, 12);
+                const pupilGeo = new THREE.SphereGeometry(0.045, 12, 12);
                 const leftPupil = new THREE.Mesh(pupilGeo, whiteMat);
                 leftPupil.position.set(-0.26, 1.22, 0.87);
                 const rightPupil = new THREE.Mesh(pupilGeo, whiteMat);
                 rightPupil.position.set(0.30, 1.22, 0.87);
 
+                const catchGeo = new THREE.SphereGeometry(0.018, 8, 8);
+                const leftCatch = new THREE.Mesh(catchGeo, whiteMat); leftCatch.position.set(-0.24, 1.24, 0.91);
+                const rightCatch = new THREE.Mesh(catchGeo, whiteMat); rightCatch.position.set(0.32, 1.24, 0.91);
+
                 petGroup.add(leftEye); petGroup.add(rightEye);
                 petGroup.add(leftPupil); petGroup.add(rightPupil);
+                petGroup.add(leftCatch); petGroup.add(rightCatch);
+
+                // Red Collar with Golden Bell
+                const collarGeo = new THREE.TorusGeometry(0.62, 0.04, 12, 24);
+                const collarMat = new THREE.MeshToonMaterial({ color: 0xef4444 });
+                const collarMesh = new THREE.Mesh(collarGeo, collarMat);
+                collarMesh.position.set(0, 0.62, 0.18);
+                collarMesh.rotation.x = Math.PI * 0.45;
+                petGroup.add(collarMesh);
+
+                const bellGeo = new THREE.SphereGeometry(0.07, 12, 12);
+                const bellMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.9, roughness: 0.1 });
+                const bellMesh = new THREE.Mesh(bellGeo, bellMat);
+                bellMesh.position.set(0, 0.52, 0.76);
+                petGroup.add(bellMesh);
 
                 // Rounded Cat Snout & Pink Nose
                 const snoutGeo = new THREE.SphereGeometry(0.14, 16, 16);
@@ -421,17 +440,43 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                 tongueMesh.rotation.x = 0.3;
                 petGroup.add(tongueMesh);
 
-                // Friendly Round Eyes
+                // Friendly Round Eyes & Catchlights
                 const eyeGeo = new THREE.SphereGeometry(0.12, 16, 16);
                 const leftEye = new THREE.Mesh(eyeGeo, darkMat); leftEye.position.set(-0.3, 1.2, 0.8);
                 const rightEye = new THREE.Mesh(eyeGeo, darkMat); rightEye.position.set(0.3, 1.2, 0.8);
 
-                const pupilGeo = new THREE.SphereGeometry(0.04, 12, 12);
+                const pupilGeo = new THREE.SphereGeometry(0.045, 12, 12);
                 const leftPupil = new THREE.Mesh(pupilGeo, whiteMat); leftPupil.position.set(-0.28, 1.23, 0.9);
                 const rightPupil = new THREE.Mesh(pupilGeo, whiteMat); rightPupil.position.set(0.32, 1.23, 0.9);
 
+                const catchGeo = new THREE.SphereGeometry(0.018, 8, 8);
+                const leftCatch = new THREE.Mesh(catchGeo, whiteMat); leftCatch.position.set(-0.26, 1.25, 0.93);
+                const rightCatch = new THREE.Mesh(catchGeo, whiteMat); rightCatch.position.set(0.34, 1.25, 0.93);
+
+                // Expressive Eyebrow Spots
+                const browGeo = new THREE.SphereGeometry(0.05, 12, 12);
+                browGeo.scale(1.2, 0.5, 0.5);
+                const leftBrow = new THREE.Mesh(browGeo, bellyMat); leftBrow.position.set(-0.28, 1.38, 0.82);
+                const rightBrow = new THREE.Mesh(browGeo, bellyMat); rightBrow.position.set(0.28, 1.38, 0.82);
+
                 petGroup.add(leftEye); petGroup.add(rightEye);
                 petGroup.add(leftPupil); petGroup.add(rightPupil);
+                petGroup.add(leftCatch); petGroup.add(rightCatch);
+                petGroup.add(leftBrow); petGroup.add(rightBrow);
+
+                // Blue Dog Collar with Gold Bone Pendant
+                const collarGeo = new THREE.TorusGeometry(0.72, 0.05, 12, 24);
+                const collarMat = new THREE.MeshToonMaterial({ color: 0x3b82f6 });
+                const collarMesh = new THREE.Mesh(collarGeo, collarMat);
+                collarMesh.position.set(0, 0.64, 0.16);
+                collarMesh.rotation.x = Math.PI * 0.45;
+                petGroup.add(collarMesh);
+
+                const boneGeo = new THREE.BoxGeometry(0.14, 0.06, 0.04);
+                const boneMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 });
+                const boneMesh = new THREE.Mesh(boneGeo, boneMat);
+                boneMesh.position.set(0, 0.5, 0.85);
+                petGroup.add(boneMesh);
 
                 // Floppy Drooping Ears
                 const earGeo = new THREE.CylinderGeometry(0.18, 0.26, 0.75, 12);
@@ -509,7 +554,7 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                 noseMesh.position.set(0, 1.02, 1.12);
                 petGroup.add(noseMesh);
 
-                // Alert Angled Eyes
+                // Alert Angled Eyes & Glossy Catchlights
                 const eyeGeo = new THREE.SphereGeometry(0.11, 16, 16);
                 eyeGeo.scale(1.2, 0.8, 0.7);
                 const leftEye = new THREE.Mesh(eyeGeo, darkMat); leftEye.position.set(-0.28, 1.18, 0.76); leftEye.rotation.z = -0.25;
@@ -519,8 +564,20 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                 const leftPupil = new THREE.Mesh(pupilGeo, whiteMat); leftPupil.position.set(-0.26, 1.22, 0.84);
                 const rightPupil = new THREE.Mesh(pupilGeo, whiteMat); rightPupil.position.set(0.30, 1.22, 0.84);
 
+                const catchGeo = new THREE.SphereGeometry(0.016, 8, 8);
+                const leftCatch = new THREE.Mesh(catchGeo, whiteMat); leftCatch.position.set(-0.24, 1.24, 0.87);
+                const rightCatch = new THREE.Mesh(catchGeo, whiteMat); rightCatch.position.set(0.32, 1.24, 0.87);
+
+                // Kitsune Celestial Forehead Diamond Mark
+                const diamondGeo = new THREE.ConeGeometry(0.06, 0.16, 4);
+                const diamondMesh = new THREE.Mesh(diamondGeo, whiteMat);
+                diamondMesh.position.set(0, 1.38, 0.82);
+                diamondMesh.rotation.z = Math.PI * 0.25;
+                petGroup.add(diamondMesh);
+
                 petGroup.add(leftEye); petGroup.add(rightEye);
                 petGroup.add(leftPupil); petGroup.add(rightPupil);
+                petGroup.add(leftCatch); petGroup.add(rightCatch);
 
                 // Large Sharp Upright Ears (Ear Swivel Target)
                 const earGeo = new THREE.ConeGeometry(0.32, 0.7, 12);
@@ -613,17 +670,22 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                 const rightTooth = new THREE.Mesh(toothGeo, whiteMat); rightTooth.position.set(0.025, 0.96, 0.88);
                 petGroup.add(leftTooth); petGroup.add(rightTooth);
 
-                // Round Bunny Eyes
+                // Round Bunny Eyes & Glossy Catchlights
                 const eyeGeo = new THREE.SphereGeometry(0.12, 16, 16);
                 const leftEye = new THREE.Mesh(eyeGeo, darkMat); leftEye.position.set(-0.28, 1.18, 0.8);
                 const rightEye = new THREE.Mesh(eyeGeo, darkMat); rightEye.position.set(0.28, 1.18, 0.8);
 
-                const pupilGeo = new THREE.SphereGeometry(0.04, 12, 12);
+                const pupilGeo = new THREE.SphereGeometry(0.045, 12, 12);
                 const leftPupil = new THREE.Mesh(pupilGeo, whiteMat); leftPupil.position.set(-0.26, 1.22, 0.9);
                 const rightPupil = new THREE.Mesh(pupilGeo, whiteMat); rightPupil.position.set(0.30, 1.22, 0.9);
 
+                const catchGeo = new THREE.SphereGeometry(0.018, 8, 8);
+                const leftCatch = new THREE.Mesh(catchGeo, whiteMat); leftCatch.position.set(-0.24, 1.24, 0.93);
+                const rightCatch = new THREE.Mesh(catchGeo, whiteMat); rightCatch.position.set(0.32, 1.24, 0.93);
+
                 petGroup.add(leftEye); petGroup.add(rightEye);
                 petGroup.add(leftPupil); petGroup.add(rightPupil);
+                petGroup.add(leftCatch); petGroup.add(rightCatch);
 
                 // Tall Ears
                 const earGeo = new THREE.CylinderGeometry(0.09, 0.18, 1.6, 14);
@@ -704,7 +766,7 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
 
                 petGroup.add(leftPatch); petGroup.add(rightPatch);
 
-                // Eyes inside Patches
+                // Eyes inside Patches with Glossy Catchlights
                 const eyeGeo = new THREE.SphereGeometry(0.07, 12, 12);
                 const leftEye = new THREE.Mesh(eyeGeo, whiteMat); leftEye.position.set(-0.28, 1.18, 0.88);
                 const rightEye = new THREE.Mesh(eyeGeo, whiteMat); rightEye.position.set(0.28, 1.18, 0.88);
@@ -713,10 +775,15 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                 const leftPupil = new THREE.Mesh(pupilGeo, darkMat); leftPupil.position.set(-0.27, 1.19, 0.94);
                 const rightPupil = new THREE.Mesh(pupilGeo, darkMat); rightPupil.position.set(0.29, 1.19, 0.94);
 
+                const catchGeo = new THREE.SphereGeometry(0.016, 8, 8);
+                const leftCatch = new THREE.Mesh(catchGeo, whiteMat); leftCatch.position.set(-0.25, 1.21, 0.96);
+                const rightCatch = new THREE.Mesh(catchGeo, whiteMat); rightCatch.position.set(0.31, 1.21, 0.96);
+
                 petGroup.add(leftEye); petGroup.add(rightEye);
                 petGroup.add(leftPupil); petGroup.add(rightPupil);
+                petGroup.add(leftCatch); petGroup.add(rightCatch);
 
-                // Stubby Flat Snout
+                // Stubby Flat Snout & Bamboo Leaf Mouth Accessory
                 const snoutGeo = new THREE.SphereGeometry(0.16, 16, 16);
                 snoutGeo.scale(1.3, 0.7, 0.6);
                 const snoutMesh = new THREE.Mesh(snoutGeo, whiteMat);
@@ -727,6 +794,15 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                 const noseMesh = new THREE.Mesh(noseGeo, darkMat);
                 noseMesh.position.set(0, 1.06, 0.94);
                 petGroup.add(noseMesh);
+
+                // Cute Bamboo Leaf in Mouth
+                const bLeafGeo = new THREE.ConeGeometry(0.05, 0.28, 4);
+                const bLeafMat = new THREE.MeshToonMaterial({ color: 0x10b981 });
+                const bLeafMesh = new THREE.Mesh(bLeafGeo, bLeafMat);
+                bLeafMesh.position.set(0.12, 0.96, 0.92);
+                bLeafMesh.rotation.z = -1.2;
+                bLeafMesh.rotation.x = 0.3;
+                petGroup.add(bLeafMesh);
 
                 // Round Dark Ears
                 const earGeo = new THREE.SphereGeometry(0.26, 16, 16);
@@ -788,7 +864,7 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                 noseMesh.position.set(0, 1.02, 0.92);
                 petGroup.add(noseMesh);
 
-                // Friendly Eyes
+                // Friendly Eyes & Glossy Catchlights
                 const eyeGeo = new THREE.SphereGeometry(0.1, 16, 16);
                 const leftEye = new THREE.Mesh(eyeGeo, darkMat); leftEye.position.set(-0.32, 1.18, 0.8);
                 const rightEye = new THREE.Mesh(eyeGeo, darkMat); rightEye.position.set(0.32, 1.18, 0.8);
@@ -797,8 +873,22 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                 const leftPupil = new THREE.Mesh(pupilGeo, whiteMat); leftPupil.position.set(-0.3, 1.2, 0.88);
                 const rightPupil = new THREE.Mesh(pupilGeo, whiteMat); rightPupil.position.set(0.34, 1.2, 0.88);
 
+                const catchGeo = new THREE.SphereGeometry(0.016, 8, 8);
+                const leftCatch = new THREE.Mesh(catchGeo, whiteMat); leftCatch.position.set(-0.28, 1.22, 0.91);
+                const rightCatch = new THREE.Mesh(catchGeo, whiteMat); rightCatch.position.set(0.36, 1.22, 0.91);
+
+                // Tucked Eucalyptus Leaf Accent Behind Ear
+                const eucLeafGeo = new THREE.ConeGeometry(0.06, 0.32, 4);
+                const eucLeafMat = new THREE.MeshToonMaterial({ color: 0x06b6d4 });
+                const eucLeafMesh = new THREE.Mesh(eucLeafGeo, eucLeafMat);
+                eucLeafMesh.position.set(-0.68, 1.62, 0.2);
+                eucLeafMesh.rotation.z = 0.8;
+                eucLeafMesh.rotation.x = -0.3;
+                petGroup.add(eucLeafMesh);
+
                 petGroup.add(leftEye); petGroup.add(rightEye);
                 petGroup.add(leftPupil); petGroup.add(rightPupil);
+                petGroup.add(leftCatch); petGroup.add(rightCatch);
 
                 // LARGE FLUFFY EAR TUFTS
                 const earGeo = new THREE.SphereGeometry(0.42, 16, 16);
