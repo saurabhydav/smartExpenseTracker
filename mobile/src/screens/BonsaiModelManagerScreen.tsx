@@ -12,6 +12,7 @@ import {
     BonsaiDownloadProgress
 } from '../services/BonsaiModelDownloader';
 import { loadBonsaiModel, isBonsaiModelLoaded, unloadBonsaiModel } from '../services/BonsaiLlmService';
+import { BonsaiModelCard } from '../components/BonsaiModelDownloaderWidget';
 
 export const BonsaiModelManagerScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     const [statuses, setStatuses] = useState<Record<string, BonsaiModelStatus>>({});
@@ -150,159 +151,9 @@ export const BonsaiModelManagerScreen: React.FC<{ navigation: any }> = ({ naviga
                 <Text style={styles.sectionTitle}>Bonsai Offline AI Models</Text>
                 <Text style={styles.sectionSubtitle}>Download, monitor progress, or delete offline GGUF binaries.</Text>
 
-                {BONSAI_MODELS.map((model) => {
-                    const status = statuses[model.id] || 'NOT_DOWNLOADED';
-                    const progress = progresses[model.id] || { percent: 0, bytesWritten: 0, speedMbps: 0, remainingSeconds: 0 };
-                    const cap = capabilities[model.id] || { isCompatible: true };
-                    const isDownloaded = status === 'READY' || status === 'MODEL_LOADED';
-                    const isDownloading = status === 'DOWNLOADING';
-                    const isPaused = status === 'PAUSED';
-                    const isVerifying = status === 'VERIFYING';
-                    const isActive = loadedModelId === model.id;
-
-                    return (
-                        <View key={model.id} style={[styles.card, isActive && styles.activeCard, !cap.isCompatible && styles.disabledCard]}>
-                            {/* Card Header */}
-                            <View style={styles.cardHeader}>
-                                <View style={styles.modelIconBg}>
-                                    <Text style={styles.treeIcon}>🌳</Text>
-                                </View>
-                                <View style={styles.cardHeaderText}>
-                                    <View style={styles.titleRow}>
-                                        <Text style={styles.modelName}>{model.modelName}</Text>
-                                        {isActive && (
-                                            <View style={styles.activeBadge}>
-                                                <Text style={styles.activeBadgeText}>ACTIVE RAM</Text>
-                                            </View>
-                                        )}
-                                    </View>
-                                    <Text style={styles.targetDevice}>{model.targetDevice}</Text>
-                                </View>
-                            </View>
-
-                            <Text style={styles.modelDesc}>{model.description}</Text>
-
-                            {/* Device Compatibility Warning */}
-                            {!cap.isCompatible && (
-                                <View style={styles.incompatibleBanner}>
-                                    <Icon name="warning" size={16} color="#f59e0b" />
-                                    <Text style={styles.incompatibleText}>{cap.reason}</Text>
-                                </View>
-                            )}
-
-                            {/* Specs Table */}
-                            <View style={styles.specsContainer}>
-                                <View style={styles.specItem}>
-                                    <Text style={styles.specLabel}>File Size</Text>
-                                    <Text style={styles.specValue}>{model.expectedSizeMB} MB</Text>
-                                </View>
-                                <View style={styles.specItem}>
-                                    <Text style={styles.specLabel}>RAM Required</Text>
-                                    <Text style={styles.specValue}>{model.ramRequired}</Text>
-                                </View>
-                                <View style={styles.specItem}>
-                                    <Text style={styles.specLabel}>Quantization</Text>
-                                    <Text style={styles.specValue}>{model.quantization}</Text>
-                                </View>
-                            </View>
-
-                            {/* Visual Progress Bar (When Downloading or Paused) */}
-                            {(isDownloading || isPaused) && (
-                                <View style={styles.progressContainer}>
-                                    <View style={styles.progressBarBackground}>
-                                        <View style={[styles.progressBarFill, { width: `${progress.percent}%` }]} />
-                                    </View>
-                                    <View style={styles.progressMeta}>
-                                        <Text style={styles.metaText}>
-                                            {(progress.bytesWritten / (1024 * 1024)).toFixed(1)} MB / {model.expectedSizeMB} MB ({progress.percent}%)
-                                        </Text>
-                                        <Text style={styles.metaText}>
-                                            {isPaused ? 'Paused' : (progress.speedMbps > 0 ? `${progress.speedMbps.toFixed(1)} MB/s` : 'Downloading...')}
-                                        </Text>
-                                    </View>
-                                </View>
-                            )}
-
-                            {/* Verifying Spinner */}
-                            {isVerifying && (
-                                <View style={styles.verifyingBanner}>
-                                    <ActivityIndicator size="small" color={colors.primary} />
-                                    <Text style={styles.verifyingText}>Verifying GGUF Checksum...</Text>
-                                </View>
-                            )}
-
-                            {/* Status and Action Controls */}
-                            <View style={styles.actionRow}>
-                                <View style={styles.statusBadge}>
-                                    <View style={[
-                                        styles.statusDot,
-                                        isDownloaded ? styles.dotGreen : (isDownloading ? styles.dotYellow : styles.dotGray)
-                                    ]} />
-                                    <Text style={styles.statusText}>
-                                        {isDownloaded ? 'Downloaded on Disk' : (isDownloading ? 'Downloading...' : (isPaused ? 'Download Paused' : 'Not Downloaded'))}
-                                    </Text>
-                                </View>
-
-                                <View style={styles.buttonGroup}>
-                                    {/* Delete Button (Trash Icon) */}
-                                    {(isDownloaded || isPaused) && (
-                                        <TouchableOpacity
-                                            style={styles.deleteButton}
-                                            onPress={() => handleDeleteModel(model)}
-                                            activeOpacity={0.7}
-                                        >
-                                            <Icon name="delete-outline" size={20} color="#ef4444" />
-                                        </TouchableOpacity>
-                                    )}
-
-                                    {/* Download / Pause / Resume / Ready Actions */}
-                                    {status === 'NOT_DOWNLOADED' && (
-                                        <TouchableOpacity
-                                            style={[styles.downloadButton, !cap.isCompatible && styles.disabledButton]}
-                                            onPress={() => handleDownloadModel(model)}
-                                            disabled={!cap.isCompatible}
-                                            activeOpacity={0.7}
-                                        >
-                                            <Icon name={cap.isCompatible ? "cloud-download" : "block"} size={18} color="#fff" />
-                                            <Text style={styles.downloadButtonText}>
-                                                {cap.isCompatible ? 'Download' : 'Disabled'}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    )}
-
-                                    {isDownloading && (
-                                        <TouchableOpacity
-                                            style={styles.pauseButton}
-                                            onPress={() => handlePauseDownload(model)}
-                                            activeOpacity={0.7}
-                                        >
-                                            <Icon name="pause" size={18} color={colors.primary} />
-                                            <Text style={styles.pauseButtonText}>Pause</Text>
-                                        </TouchableOpacity>
-                                    )}
-
-                                    {isPaused && (
-                                        <TouchableOpacity
-                                            style={styles.downloadButton}
-                                            onPress={() => handleDownloadModel(model)}
-                                            activeOpacity={0.7}
-                                        >
-                                            <Icon name="play-arrow" size={18} color="#fff" />
-                                            <Text style={styles.downloadButtonText}>Resume</Text>
-                                        </TouchableOpacity>
-                                    )}
-
-                                    {isDownloaded && (
-                                        <View style={styles.readyBadge}>
-                                            <Icon name="check-circle" size={18} color="#34d399" />
-                                            <Text style={styles.readyText}>Ready</Text>
-                                        </View>
-                                    )}
-                                </View>
-                            </View>
-                        </View>
-                    );
-                })}
+                {BONSAI_MODELS.map((model) => (
+                    <BonsaiModelCard key={model.id} model={model} />
+                ))}
             </View>
         </ScrollView>
     );

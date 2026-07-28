@@ -117,8 +117,9 @@ export async function getCodexPetAdvice(
     return cleanText;
 }
 
-export async function loadBonsaiModel(): Promise<boolean> {
-    const modelPath = BonsaiModelDownloader.getModelPath();
+export async function loadBonsaiModel(model?: import('./BonsaiModelDownloader').BonsaiModelMetadata): Promise<boolean> {
+    const targetModel = model || BONSAI_MODEL;
+    const modelPath = targetModel.localPath;
     return await llmEngine.loadModel(modelPath);
 }
 
@@ -130,6 +131,13 @@ export function cancelBonsaiGeneration(): void {
     llmEngine.cancelGeneration();
 }
 
-export function isBonsaiModelLoaded(): boolean {
-    return llmEngine.isModelLoaded();
+export function isBonsaiModelLoaded(modelId?: string): boolean {
+    if (!llmEngine.isModelLoaded()) return false;
+    if (!modelId) return true;
+    const path = llmEngine.getLoadedModelPath();
+    return path ? path.includes(modelId) || path.toLowerCase().includes(modelId.toLowerCase()) : false;
+}
+
+export function getLoadedModelPath(): string | null {
+    return llmEngine.getLoadedModelPath();
 }

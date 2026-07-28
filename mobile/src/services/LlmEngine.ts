@@ -278,6 +278,13 @@ class LlmEngineService {
             }
         }
     }
+
+    /**
+     * Get currently loaded model path
+     */
+    getLoadedModelPath(): string | null {
+        return this.context ? this.currentModelPath : null;
+    }
 }
 
 // Export singleton instance
