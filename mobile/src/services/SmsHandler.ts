@@ -13,6 +13,15 @@ async function SmsReceivedTask(data: { sender: string; body: string; timestamp: 
     console.log('SMS received in background:', data.sender);
 
     try {
+        // AI Fraud & Authenticity Verification Guard
+        const { verifySmsAuthenticity } = require('./AiSmsFraudDetector');
+        const authResult = await verifySmsAuthenticity(data.body, data.sender);
+
+        if (!authResult.isGenuine) {
+            console.warn('SMS rejected by AI Fraud Engine:', authResult.reason);
+            return;
+        }
+
         // Use smart processor - validates, parses, and learns merchants
         const result = await processSmartSms(data.body, data.sender);
 
@@ -20,9 +29,7 @@ async function SmsReceivedTask(data: { sender: string; body: string; timestamp: 
             console.log('Transaction created:', result.transactionId);
 
             if (result.needsNaming && result.merchant) {
-                // New merchant detected - will prompt user when app opens
-                console.log('New merchant needs naming:', result.merchant.rawName);
-                // The MerchantNamingModal will handle this when app is active
+                console.log('New merchant detected:', result.merchant.rawName);
             }
         } else {
             console.log('SMS processing skipped:', result.error);

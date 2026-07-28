@@ -1,4 +1,4 @@
-// Budget Screen - Category budgets with progress tracking
+// Budget Screen - Category budgets with progress tracking & AI Velocity Warnings
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -15,12 +15,13 @@ import { useAppStore } from '../store';
 import {
     updateCategoryBudget,
     insertCategory,
-    deleteCategory, // Imported
+    deleteCategory,
     type Category
 } from '../database';
 import { colors, formatCurrency, getMonthName, calculatePercentage } from '../utils';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import AddCategoryModal from '../components/AddCategoryModal';
+import { calculateBudgetDepletionVelocity, type BudgetExhaustionPrediction } from '../services/AiFeatureTransformer';
 
 interface BudgetScreenProps {
     navigation: any;
@@ -45,13 +46,18 @@ export default function BudgetScreen({ navigation }: BudgetScreenProps) {
     const [budgetInput, setBudgetInput] = useState('');
     const [showAddModal, setShowAddModal] = useState(false);
 
+    const [aiPredictions, setAiPredictions] = useState<BudgetExhaustionPrediction[]>([]);
+    const userId = user?.id || 1;
+
     useEffect(() => {
         loadCategories();
-    }, []);
+        calculateBudgetDepletionVelocity(userId).then(setAiPredictions);
+    }, [user, categorySpending]);
 
     // Combine categories with their spending
     const categoryData = safeCategories.map(category => {
         const spending = safeCategorySpending.find(cs => cs.categoryId === category.id);
+        const aiPred = aiPredictions.find(p => p.categoryId === category.id);
         return {
             ...category,
             spent: spending?.total || 0,
@@ -59,6 +65,7 @@ export default function BudgetScreen({ navigation }: BudgetScreenProps) {
             percentage: category.budgetLimit
                 ? calculatePercentage(spending?.total || 0, category.budgetLimit)
                 : 0,
+            aiPred,
         };
     }).sort((a, b) => b.spent - a.spent);
 
@@ -78,44 +85,40 @@ export default function BudgetScreen({ navigation }: BudgetScreenProps) {
         try {
             await updateCategoryBudget(editingCategory.id, user.id, budget);
             await loadCategories();
+            setEditingCategory(null);
+            setBudgetInput('');
+            refreshAll();
+            calculateBudgetDepletionVelocity(user.id).then(setAiPredictions);
         } catch (error) {
-            console.error('Failed to update category budget:', error);
-            Alert.alert('Error', 'Failed to save budget limit');
-        }
-        setEditingCategory(null);
-        setBudgetInput('');
-    };
-
-    const handleAddCategory = async (name: string, icon: string, color: string, budget: number | null) => {
-        if (!user) {
-            Alert.alert('Error', 'You must be logged in to create categories');
-            return;
-        }
-        try {
-            await insertCategory({
-                name,
-                icon,
-                color,
-                budgetLimit: budget,
-                userId: user.id
-            });
-            setShowAddModal(false);
-            loadCategories();
-        } catch (error) {
-            console.error('Failed to add category:', error);
-            const errMsg = error instanceof Error ? error.message : String(error);
-
-            if (errMsg.includes('already exists')) {
-                Alert.alert('Duplicate Category', 'This category name is already in use.');
-            } else {
-                Alert.alert('Error', 'Could not create category.');
-            }
+            console.error('Error updating budget:', error);
+            Alert.alert('Error', 'Failed to update budget');
         }
     };
 
-    const openEditModal = (category: Category) => {
-        setEditingCategory(category);
-        setBudgetInput(category.budgetLimit?.toString() || '');
+    const handleDeleteCategory = (category: Category) => {
+        if (!user) return;
+
+        Alert.alert(
+            'Delete Category',
+            `Are you sure you want to delete "${category.name}"? Transactions in this category will be reassigned to Uncategorized.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await deleteCategory(category.id, user.id);
+                            await loadCategories();
+                            refreshAll();
+                        } catch (error) {
+                            console.error('Error deleting category:', error);
+                            Alert.alert('Error', 'Failed to delete category');
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     const getProgressColor = (percentage: number): string => {
@@ -123,6 +126,8 @@ export default function BudgetScreen({ navigation }: BudgetScreenProps) {
         if (percentage >= 80) return colors.warning;
         return colors.credit;
     };
+
+    const highRiskPredictions = aiPredictions.filter(p => p.isExhaustionRisk);
 
     return (
         <ScrollView style={styles.container}>
@@ -141,6 +146,21 @@ export default function BudgetScreen({ navigation }: BudgetScreenProps) {
                     <Icon name="add" size={24} color={colors.text} />
                 </TouchableOpacity>
             </View>
+
+            {/* AI BUDGET EXHAUSTION WARNING BANNER */}
+            {highRiskPredictions.length > 0 && (
+                <View style={styles.aiDepletionBanner}>
+                    <View style={styles.aiDepletionHeader}>
+                        <Icon name="speed" size={18} color="#ef4444" />
+                        <Text style={styles.aiDepletionTitle}>AI SPEED WARNING</Text>
+                    </View>
+                    {highRiskPredictions.map((pred) => (
+                        <Text key={pred.categoryId} style={styles.aiDepletionText}>
+                            ⚠️ <Text style={{ fontWeight: 'bold', color: colors.text }}>{pred.categoryName}</Text> budget projected to exhaust on <Text style={{ color: '#ef4444', fontWeight: 'bold' }}>{pred.projectedDepletionDate}</Text> (₹{pred.dailyVelocity}/day velocity)
+                        </Text>
+                    ))}
+                </View>
+            )}
 
             {/* Overview Card */}
             <View style={styles.overviewCard}>
@@ -181,31 +201,47 @@ export default function BudgetScreen({ navigation }: BudgetScreenProps) {
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Category Budgets</Text>
 
-                {categoryData.map((category) => (
-                    <TouchableOpacity
-                        key={category.id}
-                        style={styles.categoryCard}
-                        onPress={() => openEditModal(category)}
-                    >
+                {categoryData.map(category => (
+                    <View key={category.id} style={styles.categoryCard}>
                         <View style={styles.categoryHeader}>
-                            <View style={styles.categoryInfo}>
+                            <View style={styles.categoryTitleGroup}>
                                 <View style={[styles.categoryIcon, { backgroundColor: category.color + '20' }]}>
-                                    <Icon name={category.icon || 'label'} size={20} color={category.color} />
+                                    <Icon name={category.icon} size={20} color={category.color} />
                                 </View>
-                                <Text style={styles.categoryName}>{category.name}</Text>
+                                <View>
+                                    <Text style={styles.categoryName}>{category.name}</Text>
+                                    {category.budgetLimit ? (
+                                        <Text style={styles.budgetText}>
+                                            {formatCurrency(category.spent)} of {formatCurrency(category.budgetLimit)}
+                                        </Text>
+                                    ) : (
+                                        <Text style={styles.noBudgetText}>No budget set</Text>
+                                    )}
+                                </View>
                             </View>
-                            <Icon name="edit" size={18} color={colors.textMuted} />
-                        </View>
 
-                        <View style={styles.categoryStats}>
-                            <Text style={styles.spentAmount}>{formatCurrency(category.spent)}</Text>
-                            <Text style={styles.budgetAmount}>
-                                / {category.budgetLimit ? formatCurrency(category.budgetLimit) : 'No budget'}
-                            </Text>
+                            <View style={styles.actionGroup}>
+                                <TouchableOpacity
+                                    style={styles.editButton}
+                                    onPress={() => {
+                                        setEditingCategory(category);
+                                        setBudgetInput(category.budgetLimit ? category.budgetLimit.toString() : '');
+                                    }}
+                                >
+                                    <Icon name="edit" size={18} color={colors.textSecondary} />
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={styles.deleteButton}
+                                    onPress={() => handleDeleteCategory(category)}
+                                >
+                                    <Icon name="delete-outline" size={18} color={colors.debit} />
+                                </TouchableOpacity>
+                            </View>
                         </View>
 
                         {category.budgetLimit && (
-                            <>
+                            <View style={styles.progressContainer}>
                                 <View style={styles.progressBar}>
                                     <View
                                         style={[
@@ -217,32 +253,23 @@ export default function BudgetScreen({ navigation }: BudgetScreenProps) {
                                         ]}
                                     />
                                 </View>
-                                <View style={styles.categoryFooter}>
-                                    <Text style={[
-                                        styles.remainingText,
-                                        { color: category.remaining! >= 0 ? colors.credit : colors.debit }
-                                    ]}>
-                                        {category.remaining! >= 0
-                                            ? `${formatCurrency(category.remaining!)} remaining`
-                                            : `${formatCurrency(Math.abs(category.remaining!))} over budget`
-                                        }
+                                <View style={styles.progressFooter}>
+                                    <Text style={[styles.remainingText, { color: category.remaining && category.remaining < 0 ? colors.debit : colors.textSecondary }]}>
+                                        {category.remaining !== null
+                                            ? category.remaining >= 0
+                                                ? `${formatCurrency(category.remaining)} left`
+                                                : `${formatCurrency(Math.abs(category.remaining))} over`
+                                            : ''}
                                     </Text>
                                     <Text style={[styles.percentageText, { color: getProgressColor(category.percentage) }]}>
                                         {category.percentage}%
                                     </Text>
                                 </View>
-                            </>
+                            </View>
                         )}
-                    </TouchableOpacity>
+                    </View>
                 ))}
             </View>
-
-            {/* Add Category Modal */}
-            <AddCategoryModal
-                visible={showAddModal}
-                onClose={() => setShowAddModal(false)}
-                onSave={handleAddCategory}
-            />
 
             {/* Edit Budget Modal */}
             <Modal
@@ -253,65 +280,25 @@ export default function BudgetScreen({ navigation }: BudgetScreenProps) {
             >
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Set Budget</Text>
-                        <Text style={styles.modalSubtitle}>{editingCategory?.name}</Text>
+                        <Text style={styles.modalTitle}>Set Budget for {editingCategory?.name}</Text>
 
-                        <View style={styles.budgetInputContainer}>
-                            <Text style={styles.currencySymbol}>₹</Text>
-                            <TextInput
-                                style={styles.budgetInput}
-                                placeholder="Enter budget"
-                                placeholderTextColor={colors.textMuted}
-                                value={budgetInput}
-                                onChangeText={setBudgetInput}
-                                keyboardType="decimal-pad"
-                                autoFocus
-                            />
-                        </View>
-
-                        <Text style={styles.hint}>Leave empty to remove budget limit</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Enter amount (leave empty to remove)"
+                            placeholderTextColor={colors.textMuted}
+                            keyboardType="numeric"
+                            value={budgetInput}
+                            onChangeText={setBudgetInput}
+                        />
 
                         <View style={styles.modalButtons}>
-                            {/* Delete Button (Icon only or small text) */}
-                            <TouchableOpacity
-                                style={styles.deleteButton}
-                                onPress={() => {
-                                    Alert.alert(
-                                        'Delete Category',
-                                        `Are you sure you want to delete "${editingCategory?.name}"? Transactions will become Uncategorized.`,
-                                        [
-                                            { text: 'Cancel', style: 'cancel' },
-                                            {
-                                                text: 'Delete',
-                                                style: 'destructive',
-                                                onPress: async () => {
-                                                    if (editingCategory && user) {
-                                                        try {
-                                                            await deleteCategory(editingCategory.id, user.id);
-                                                            setEditingCategory(null);
-                                                            // Small delay to ensure DB update propagates before reload
-                                                            setTimeout(() => loadCategories(), 100);
-                                                        } catch (error) {
-                                                            console.error('Failed to delete category:', error);
-                                                            const errMsg = error instanceof Error ? error.message : String(error);
-                                                            Alert.alert('Error', `Failed to delete: ${errMsg}`);
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        ]
-                                    );
-                                }}
-                            >
-                                <Icon name="delete" size={24} color={colors.debit} />
-                            </TouchableOpacity>
-
                             <TouchableOpacity
                                 style={styles.cancelButton}
                                 onPress={() => setEditingCategory(null)}
                             >
                                 <Text style={styles.cancelButtonText}>Cancel</Text>
                             </TouchableOpacity>
+
                             <TouchableOpacity
                                 style={styles.saveButton}
                                 onPress={handleSaveBudget}
@@ -323,7 +310,22 @@ export default function BudgetScreen({ navigation }: BudgetScreenProps) {
                 </View>
             </Modal>
 
-            <View style={{ height: 100 }} />
+            {/* Add Category Modal */}
+            <AddCategoryModal
+                visible={showAddModal}
+                onClose={() => setShowAddModal(false)}
+                onSave={async (name, icon, color, budget) => {
+                    if (!user) return;
+                    try {
+                        await insertCategory({ name, icon, color, budgetLimit: budget, userId: user.id });
+                        await loadCategories();
+                        refreshAll();
+                    } catch (e) {
+                        console.error('Failed to create category:', e);
+                    }
+                    setShowAddModal(false);
+                }}
+            />
         </ScrollView>
     );
 }
@@ -334,21 +336,12 @@ const styles = StyleSheet.create({
         backgroundColor: colors.background,
     },
     header: {
-        padding: 24,
-        paddingTop: 48,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-    },
-    addButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        backgroundColor: colors.surface,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: colors.border,
+        paddingHorizontal: 24,
+        paddingTop: 48,
+        paddingBottom: 16,
     },
     title: {
         fontSize: 24,
@@ -358,14 +351,51 @@ const styles = StyleSheet.create({
     subtitle: {
         fontSize: 14,
         color: colors.textSecondary,
-        marginTop: 4,
+        marginTop: 2,
+    },
+    addButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: colors.surface,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: colors.border,
+    },
+    aiDepletionBanner: {
+        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+        marginHorizontal: 24,
+        marginBottom: 16,
+        padding: 14,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(239, 68, 68, 0.3)',
+        gap: 6,
+    },
+    aiDepletionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    aiDepletionTitle: {
+        fontSize: 11,
+        fontWeight: 'bold',
+        color: '#ef4444',
+    },
+    aiDepletionText: {
+        fontSize: 12,
+        color: colors.textSecondary,
+        lineHeight: 16,
     },
     overviewCard: {
         backgroundColor: colors.surface,
         marginHorizontal: 24,
-        borderRadius: 16,
-        padding: 20,
         marginBottom: 24,
+        padding: 20,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: colors.border,
     },
     overviewRow: {
         flexDirection: 'row',
@@ -375,96 +405,110 @@ const styles = StyleSheet.create({
         alignItems: 'flex-end',
     },
     overviewLabel: {
-        fontSize: 13,
+        fontSize: 14,
         color: colors.textSecondary,
     },
     overviewAmount: {
-        fontSize: 22,
+        fontSize: 24,
         fontWeight: 'bold',
         color: colors.text,
         marginTop: 4,
     },
     overviewProgress: {
-        marginTop: 20,
+        marginTop: 16,
+    },
+    progressBar: {
+        height: 8,
+        backgroundColor: colors.background,
+        borderRadius: 4,
+        overflow: 'hidden',
+    },
+    progressFill: {
+        height: '100%',
+        borderRadius: 4,
+    },
+    percentageText: {
+        fontSize: 12,
+        fontWeight: '600',
+        marginTop: 4,
+        textAlign: 'right',
     },
     section: {
         paddingHorizontal: 24,
+        marginBottom: 24,
     },
     sectionTitle: {
-        fontSize: 16,
-        fontWeight: '600',
+        fontSize: 18,
+        fontWeight: 'bold',
         color: colors.text,
         marginBottom: 16,
     },
     categoryCard: {
         backgroundColor: colors.surface,
-        borderRadius: 14,
         padding: 16,
+        borderRadius: 16,
         marginBottom: 12,
+        borderWidth: 1,
+        borderColor: colors.border,
     },
     categoryHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 12,
     },
-    categoryInfo: {
+    categoryTitleGroup: {
         flexDirection: 'row',
         alignItems: 'center',
     },
+    actionGroup: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
     categoryIcon: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
+        width: 40,
+        height: 40,
+        borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
+        marginRight: 12,
     },
     categoryName: {
         fontSize: 15,
-        fontWeight: '500',
-        color: colors.text,
-        marginLeft: 12,
-    },
-    categoryStats: {
-        flexDirection: 'row',
-        alignItems: 'baseline',
-        marginBottom: 10,
-    },
-    spentAmount: {
-        fontSize: 20,
         fontWeight: '600',
         color: colors.text,
     },
-    budgetAmount: {
-        fontSize: 14,
+    budgetText: {
+        fontSize: 12,
         color: colors.textSecondary,
-        marginLeft: 4,
+        marginTop: 2,
     },
-    progressBar: {
-        height: 6,
-        backgroundColor: colors.surfaceLight,
-        borderRadius: 3,
-        marginBottom: 8,
+    noBudgetText: {
+        fontSize: 12,
+        color: colors.textMuted,
+        marginTop: 2,
     },
-    progressFill: {
-        height: '100%',
-        borderRadius: 3,
+    editButton: {
+        padding: 6,
     },
-    categoryFooter: {
+    deleteButton: {
+        padding: 6,
+    },
+    progressContainer: {
+        marginTop: 12,
+    },
+    progressFooter: {
         flexDirection: 'row',
         justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 4,
     },
     remainingText: {
         fontSize: 12,
-        fontWeight: '500',
-    },
-    percentageText: {
-        fontSize: 12,
-        fontWeight: '600',
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.6)',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
         justifyContent: 'center',
         alignItems: 'center',
         padding: 24,
@@ -474,81 +518,49 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         padding: 24,
         width: '100%',
-        maxWidth: 340,
+        borderWidth: 1,
+        borderColor: colors.border,
     },
     modalTitle: {
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: 'bold',
         color: colors.text,
-        textAlign: 'center',
+        marginBottom: 16,
     },
-    modalSubtitle: {
-        fontSize: 14,
-        color: colors.textSecondary,
-        textAlign: 'center',
-        marginTop: 4,
-        marginBottom: 24,
-    },
-    budgetInputContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
+    input: {
         backgroundColor: colors.background,
         borderRadius: 12,
-        paddingHorizontal: 16,
-    },
-    currencySymbol: {
-        fontSize: 24,
-        fontWeight: 'bold',
+        padding: 14,
         color: colors.text,
-    },
-    budgetInput: {
-        flex: 1,
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: colors.text,
-        padding: 16,
-    },
-    hint: {
-        fontSize: 12,
-        color: colors.textMuted,
-        textAlign: 'center',
-        marginTop: 12,
+        fontSize: 16,
+        borderWidth: 1,
+        borderColor: colors.border,
+        marginBottom: 20,
     },
     modalButtons: {
         flexDirection: 'row',
-        marginTop: 24,
+        justifyContent: 'flex-end',
         gap: 12,
     },
     cancelButton: {
-        flex: 1,
-        padding: 14,
-        borderRadius: 12,
-        backgroundColor: colors.surfaceLight,
-        alignItems: 'center',
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 10,
     },
     cancelButtonText: {
-        fontSize: 16,
-        fontWeight: '600',
         color: colors.textSecondary,
+        fontSize: 14,
+        fontWeight: '600',
     },
     saveButton: {
-        flex: 1,
-        padding: 14,
-        borderRadius: 12,
         backgroundColor: colors.primary,
-        alignItems: 'center',
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 10,
     },
     saveButtonText: {
-        fontSize: 16,
+        color: '#ffffff',
+        fontSize: 14,
         fontWeight: '600',
-        color: colors.text,
-    },
-    deleteButton: {
-        padding: 14,
-        borderRadius: 12,
-        backgroundColor: colors.debit + '20', // Light red
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: 50,
     },
 });

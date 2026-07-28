@@ -9,3 +9,5 @@ export { default as InsightsScreen } from './InsightsScreen';
 export { default as MerchantContactsScreen } from './MerchantContactsScreen';
 export { default as BiometricLockScreen } from './BiometricLockScreen';
 export { default as TransactionDetailScreen } from './TransactionDetailScreen';
+export { default as AiAdvisorScreen } from './AiAdvisorScreen';
+

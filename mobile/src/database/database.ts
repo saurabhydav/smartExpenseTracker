@@ -26,10 +26,24 @@ export async function initDatabase(): Promise<void> {
             location: 'default',
         });
 
+        // Enable Pragmas for speed, WAL mode, foreign keys, and integrity
+        try {
+            await db.executeSql('PRAGMA foreign_keys = ON');
+            await db.executeSql('PRAGMA journal_mode = WAL');
+            await db.executeSql('PRAGMA auto_vacuum = INCREMENTAL');
+        } catch (e) {
+            console.warn('Non-critical pragma initialization note:', e);
+        }
+
         // Create tables
         for (const sql of CREATE_TABLES_SQL) {
             await db.executeSql(sql);
         }
+
+        // Performance & Multi-threading Composite Indexes (Sub-5ms query target)
+        await db.executeSql('CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(user_id, date, type)');
+        await db.executeSql('CREATE INDEX IF NOT EXISTS idx_transactions_category ON transactions(user_id, category_id)');
+
 
         // Create accounts table
         const { CREATE_ACCOUNTS_TABLE_SQL } = require('./schema');
@@ -217,11 +231,27 @@ export async function initDatabase(): Promise<void> {
             await seedDefaultData();
         }
 
+        // Migration v8: Add deleted_at soft-delete column to transactions
+        try {
+            await db.executeSql('ALTER TABLE transactions ADD COLUMN deleted_at TEXT');
+        } catch (e) {
+            // Column already exists
+        }
+
         console.log('Database initialized successfully');
     } catch (error) {
         console.error('Failed to initialize database:', error);
         throw error;
     }
+}
+
+// Sanitization & UTF-8 encoding helper for merchant names (Steps 8 & 15)
+export function sanitizeMerchantName(rawName: string): string {
+    if (!rawName) return 'Unknown Merchant';
+    // Remove control characters, trim leading/trailing whitespace, and normalize Unicode UTF-8
+    let cleaned = rawName.normalize('NFC').replace(/[\x00-\x1F\x7F]/g, '').trim();
+    // Truncate to 100 characters max
+    return cleaned.substring(0, 100) || 'Unknown Merchant';
 }
 
 // Seed default categories and merchant mappings
@@ -251,6 +281,26 @@ export function getDatabase(): SQLiteDatabase {
         throw new Error('Database not initialized. Call initDatabase() first.');
     }
     return db;
+}
+
+// Helper for thread-safe execution with exponential backoff on BUSY / LOCKED errors
+export async function executeSqlWithRetry(sql: string, params: any[] = [], maxRetries = 3): Promise<any> {
+    const database = getDatabase();
+    let attempt = 0;
+    while (attempt < maxRetries) {
+        try {
+            return await database.executeSql(sql, params);
+        } catch (error: any) {
+            attempt++;
+            if (error?.message?.includes('busy') || error?.message?.includes('locked')) {
+                if (attempt < maxRetries) {
+                    await new Promise(res => setTimeout(res, 50 * Math.pow(2, attempt)));
+                    continue;
+                }
+            }
+            throw error;
+        }
+    }
 }
 
 // Close database connection
@@ -394,6 +444,52 @@ export async function updateTransaction(id: number, userId: number, updates: Par
         values.push(id, userId);
         await database.executeSql(`UPDATE transactions SET ${fields.join(', ')} WHERE id = ? AND user_id = ?`, values);
     }
+}
+
+// Delete single transaction (supports soft delete for recovery, Step 12)
+export async function deleteTransaction(id: number, userId: number, softDelete: boolean = true): Promise<void> {
+    const database = getDatabase();
+    if (softDelete) {
+        await database.executeSql('UPDATE transactions SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?', [id, userId]);
+    } else {
+        await database.executeSql('DELETE FROM transactions WHERE id = ? AND user_id = ?', [id, userId]);
+    }
+}
+
+// Atomic batch deletion with automatic transaction rollback (Step 10)
+export async function deleteTransactionsBatch(ids: number[], userId: number): Promise<void> {
+    if (!ids || ids.length === 0) return;
+    const database = getDatabase();
+
+    await database.transaction(async (tx) => {
+        for (const id of ids) {
+            await tx.executeSql('UPDATE transactions SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?', [id, userId]);
+        }
+    });
+}
+
+// Category deletion with fallback auto-assignment for orphaned transactions (Step 9)
+export async function deleteCategoryWithFallback(categoryId: number, userId: number, fallbackCategoryId?: number): Promise<void> {
+    const database = getDatabase();
+
+    let targetCatId = fallbackCategoryId;
+    if (!targetCatId) {
+        const [otherCat] = await database.executeSql('SELECT id FROM categories WHERE user_id = ? AND id != ? LIMIT 1', [userId, categoryId]);
+        if (otherCat && otherCat.rows && otherCat.rows.length > 0) {
+            targetCatId = otherCat.rows.item(0).id;
+        }
+    }
+
+    if (targetCatId) {
+        // Reassign orphaned transactions to fallback category
+        await database.executeSql('UPDATE transactions SET category_id = ? WHERE category_id = ? AND user_id = ?', [targetCatId, categoryId, userId]);
+    }
+
+    // Delete merchant mappings referencing this category
+    await database.executeSql('DELETE FROM merchant_mapping WHERE category_id = ? AND user_id = ?', [categoryId, userId]);
+
+    // Delete the category
+    await database.executeSql('DELETE FROM categories WHERE id = ? AND user_id = ?', [categoryId, userId]);
 }
 
 // ... (initialization code skipped for brevity, user checks it anyway) ...
@@ -637,16 +733,6 @@ export async function deleteCategory(id: number, userId: number): Promise<void> 
         console.log(`Category ${id} deleted successfully for user ${userId}`);
     } catch (error) {
         console.error('Delete Category Error:', error);
-        throw error;
-    }
-}
-
-export async function deleteTransaction(id: number, userId: number): Promise<void> {
-    const database = getDatabase();
-    try {
-        await database.executeSql('DELETE FROM transactions WHERE id = ? AND user_id = ?', [id, userId]);
-    } catch (error) {
-        console.error('Delete Transaction Error:', error);
         throw error;
     }
 }

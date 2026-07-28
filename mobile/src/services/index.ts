@@ -11,3 +11,11 @@ export { default as AnalyticsService } from './AnalyticsService';
 export { default as ReportService } from './ReportService';
 export { default as SmartSmsProcessor } from './SmartSmsProcessor';
 export * from './SmartSmsProcessor';
+export * from './TamagotchiService';
+export * from './BonsaiLlmService';
+export * from './AiSmsFraudDetector';
+export * from './AiFeatureTransformer';
+
+
+
+

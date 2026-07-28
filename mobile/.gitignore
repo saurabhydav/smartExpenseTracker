@@ -5,3 +5,7 @@ android/.gradle/
 
 # Dependencies
 node_modules/
+
+# Generated bundles
+index.android.bundle
+android/app/src/main/assets/index.android.bundle

@@ -22,6 +22,7 @@ import {
     MerchantContactsScreen,
     BiometricLockScreen,
     TransactionDetailScreen,
+    AiAdvisorScreen,
 } from './src/screens';
 import { isBiometricLockEnabled } from './src/screens/BiometricLockScreen';
 
@@ -69,6 +70,9 @@ function MainTabs() {
                         case 'Insights':
                             iconName = 'insights';
                             break;
+                        case 'AiAdvisor':
+                            iconName = 'auto-awesome';
+                            break;
                         case 'Budget':
                             iconName = 'pie-chart';
                             break;
@@ -84,11 +88,14 @@ function MainTabs() {
             <Tab.Screen name="Dashboard" component={DashboardScreen} />
             <Tab.Screen name="Transactions" component={TransactionsScreen} />
             <Tab.Screen name="Insights" component={InsightsScreen} />
+            <Tab.Screen name="AiAdvisor" component={AiAdvisorScreen} options={{ tabBarLabel: 'AI Chat' }} />
             <Tab.Screen name="Budget" component={BudgetScreen} />
             <Tab.Screen name="Settings" component={SettingsScreen} />
         </Tab.Navigator>
     );
 }
+
+import { BonsaiModelManagerScreen } from './src/screens/BonsaiModelManagerScreen';
 
 // App Stack with modals
 function AppStack() {
@@ -107,6 +114,16 @@ function AppStack() {
             <Stack.Screen
                 name="TransactionDetail"
                 component={TransactionDetailScreen}
+                options={{ presentation: 'card' }}
+            />
+            <Stack.Screen
+                name="AiAdvisor"
+                component={AiAdvisorScreen}
+                options={{ presentation: 'card' }}
+            />
+            <Stack.Screen
+                name="BonsaiModelManager"
+                component={BonsaiModelManagerScreen}
                 options={{ presentation: 'card' }}
             />
         </Stack.Navigator>

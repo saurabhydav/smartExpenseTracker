@@ -1,6 +1,6 @@
-// Dashboard Screen - Main expense overview
+// Dashboard Screen - Main expense overview with AI Integration
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View,
     Text,
@@ -15,6 +15,8 @@ import { useAppStore } from '../store';
 import { colors, formatCurrency, getMonthName, calculatePercentage } from '../utils';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { checkUpcomingSubscriptionsAndNotify } from '../services/SubscriptionService';
+import { FinancialTamagotchi } from '../components';
+import { getDailyInsight } from '../services/AIAdvisorService';
 
 const { width } = Dimensions.get('window');
 
@@ -46,15 +48,39 @@ export default function DashboardScreen({ navigation }: DashboardScreenProps) {
     const safeCategories = Array.isArray(categories) ? categories : [];
     const safeCategorySpending = Array.isArray(categorySpending) ? categorySpending : [];
 
-    const [refreshing, setRefreshing] = React.useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+    const [aiSummary, setAiSummary] = useState<string>('Analyzing your monthly financial health...');
+    const [healthScore, setHealthScore] = useState<number>(85);
+
+    const userId = user?.id || 1;
+
+    const loadAiInsights = async () => {
+        try {
+            const insight = await getDailyInsight(userId);
+            setAiSummary(insight);
+            // Calculate dynamic health score from budget usage
+            const safeCS = Array.isArray(categorySpending) ? categorySpending : [];
+            const totalBudget = safeCategories.reduce((s, c) => s + (c.budgetLimit || 0), 0);
+            if (totalBudget > 0) {
+                const usagePct = (monthlyTotal / totalBudget) * 100;
+                setHealthScore(Math.max(30, Math.min(98, Math.round(100 - usagePct))));
+            } else {
+                setHealthScore(75);
+            }
+        } catch (e) {
+            setAiSummary('Keep tracking your daily expenses to keep your budget healthy!');
+        }
+    };
 
     useEffect(() => {
         refreshAll();
+        loadAiInsights();
         if (user) {
             checkUpcomingSubscriptionsAndNotify(user.id);
         }
         const subscription = DeviceEventEmitter.addListener('TRANSACTION_UPDATED', () => {
             refreshAll();
+            loadAiInsights();
         });
         return () => subscription.remove();
     }, [user]);
@@ -62,6 +88,7 @@ export default function DashboardScreen({ navigation }: DashboardScreenProps) {
     const onRefresh = async () => {
         setRefreshing(true);
         refreshAll();
+        await loadAiInsights();
         setRefreshing(false);
     };
 
@@ -124,6 +151,13 @@ export default function DashboardScreen({ navigation }: DashboardScreenProps) {
                 <TouchableOpacity onPress={() => navigateMonth(1)}>
                     <Icon name="chevron-right" size={28} color={colors.text} />
                 </TouchableOpacity>
+            </View>
+
+
+
+            {/* Financial Tamagotchi Pet Widget */}
+            <View style={{ marginHorizontal: 16, marginBottom: 12 }}>
+                <FinancialTamagotchi />
             </View>
 
             {/* Total Spending Card */}
@@ -196,31 +230,27 @@ export default function DashboardScreen({ navigation }: DashboardScreenProps) {
                         <TouchableOpacity
                             key={transaction.id}
                             style={styles.transactionRow}
-                            onPress={() => navigation.navigate('TransactionDetail', { id: transaction.id })}
+                            onPress={() => navigation.navigate('TransactionDetail', { transaction })}
                         >
-                            <View style={[styles.transactionIcon, { backgroundColor: (category?.color || colors.textMuted) + '20' }]}>
-                                <Icon name={category?.icon || 'receipt'} size={20} color={category?.color || colors.textMuted} />
+                            <View style={[styles.categoryIcon, { backgroundColor: (category?.color || colors.primary) + '20' }]}>
+                                <Icon name={category?.icon || 'receipt'} size={20} color={category?.color || colors.primary} />
                             </View>
                             <View style={styles.transactionInfo}>
-                                <Text style={styles.transactionMerchant}>{transaction.merchant}</Text>
+                                <Text style={styles.merchantName}>{transaction.merchant}</Text>
                                 <Text style={styles.transactionDate}>{transaction.date}</Text>
                             </View>
-                            <Text style={[
-                                styles.transactionAmount,
-                                { color: transaction.type === 'debit' ? colors.debit : colors.credit }
-                            ]}>
+                            <Text
+                                style={[
+                                    styles.transactionAmount,
+                                    { color: transaction.type === 'debit' ? colors.debit : colors.credit }
+                                ]}
+                            >
                                 {transaction.type === 'debit' ? '-' : '+'}{formatCurrency(transaction.amount)}
                             </Text>
                         </TouchableOpacity>
                     );
                 })}
-
-                {transactions.length === 0 && (
-                    <Text style={styles.emptyText}>No transactions yet</Text>
-                )}
             </View>
-
-            <View style={{ height: 100 }} />
         </ScrollView>
     );
 }
@@ -234,8 +264,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: 24,
+        paddingHorizontal: 24,
         paddingTop: 48,
+        paddingBottom: 16,
     },
     greeting: {
         fontSize: 24,
@@ -245,72 +276,126 @@ const styles = StyleSheet.create({
     subtitle: {
         fontSize: 14,
         color: colors.textSecondary,
-        marginTop: 4,
+        marginTop: 2,
     },
     profileButton: {
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: colors.primary + '15', // light primary tint
+        backgroundColor: colors.primary,
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1.5,
-        borderColor: colors.primary,
     },
     profileButtonText: {
-        fontSize: 15,
+        color: '#ffffff',
         fontWeight: 'bold',
-        color: colors.primary,
+        fontSize: 16,
     },
     monthSelector: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'space-between',
         paddingHorizontal: 24,
-        marginBottom: 16,
+        marginVertical: 8,
     },
     monthText: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '600',
         color: colors.text,
-        marginHorizontal: 16,
+    },
+    aiHealthCard: {
+        backgroundColor: colors.surface,
+        marginHorizontal: 24,
+        marginVertical: 12,
+        padding: 16,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(59, 130, 246, 0.3)',
+    },
+    aiHealthHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    aiBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(59, 130, 246, 0.15)',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    aiBadgeText: {
+        fontSize: 11,
+        fontWeight: 'bold',
+        color: colors.primary,
+    },
+    healthScoreText: {
+        fontSize: 15,
+        fontWeight: 'bold',
+        color: colors.text,
+    },
+    aiSummaryText: {
+        fontSize: 13,
+        color: colors.textSecondary,
+        lineHeight: 18,
+        marginBottom: 12,
+    },
+    aiChatButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        backgroundColor: colors.primary,
+        paddingVertical: 10,
+        borderRadius: 12,
+    },
+    aiChatButtonText: {
+        color: '#ffffff',
+        fontWeight: 'bold',
+        fontSize: 13,
     },
     totalCard: {
         marginHorizontal: 24,
+        marginBottom: 20,
         borderRadius: 20,
         overflow: 'hidden',
+        backgroundColor: colors.surface,
+        borderWidth: 1,
+        borderColor: colors.border,
     },
     totalCardGradient: {
-        backgroundColor: colors.primary,
-        padding: 24,
+        padding: 20,
     },
     totalLabel: {
         fontSize: 14,
-        color: 'rgba(255,255,255,0.8)',
+        color: colors.textSecondary,
     },
     totalAmount: {
-        fontSize: 36,
+        fontSize: 32,
         fontWeight: 'bold',
         color: colors.text,
-        marginTop: 8,
+        marginVertical: 8,
     },
     totalStats: {
         flexDirection: 'row',
-        marginTop: 16,
+        gap: 16,
+        marginTop: 4,
     },
     statItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginRight: 24,
+        gap: 4,
     },
     statText: {
         fontSize: 12,
-        color: 'rgba(255,255,255,0.8)',
-        marginLeft: 4,
+        color: colors.textMuted,
     },
     section: {
-        marginTop: 24,
         paddingHorizontal: 24,
+        marginBottom: 24,
     },
     sectionHeader: {
         flexDirection: 'row',
@@ -320,90 +405,83 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 18,
-        fontWeight: '600',
+        fontWeight: 'bold',
         color: colors.text,
     },
     seeAllText: {
         fontSize: 14,
         color: colors.primary,
+        fontWeight: '600',
     },
     categoryRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.surface,
-        padding: 16,
-        borderRadius: 12,
-        marginBottom: 12,
+        marginBottom: 14,
     },
     categoryIcon: {
         width: 40,
         height: 40,
-        borderRadius: 10,
+        borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
+        marginRight: 12,
     },
     categoryInfo: {
         flex: 1,
-        marginLeft: 12,
+        marginRight: 12,
     },
     categoryName: {
         fontSize: 14,
-        fontWeight: '500',
+        fontWeight: '600',
         color: colors.text,
-        marginBottom: 6,
+        marginBottom: 4,
     },
     progressBar: {
-        height: 4,
-        backgroundColor: colors.surfaceLight,
-        borderRadius: 2,
+        height: 6,
+        backgroundColor: colors.surface,
+        borderRadius: 3,
+        overflow: 'hidden',
     },
     progressFill: {
         height: '100%',
-        borderRadius: 2,
+        borderRadius: 3,
     },
     categoryAmount: {
         fontSize: 14,
         fontWeight: '600',
         color: colors.text,
-        marginLeft: 12,
     },
     transactionRow: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: colors.surface,
-        padding: 16,
-        borderRadius: 12,
-        marginBottom: 12,
-    },
-    transactionIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 10,
-        alignItems: 'center',
-        justifyContent: 'center',
+        padding: 14,
+        borderRadius: 16,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: colors.border,
     },
     transactionInfo: {
         flex: 1,
-        marginLeft: 12,
     },
-    transactionMerchant: {
+    merchantName: {
         fontSize: 14,
-        fontWeight: '500',
+        fontWeight: '600',
         color: colors.text,
     },
     transactionDate: {
-        fontSize: 12,
-        color: colors.textSecondary,
+        fontSize: 11,
+        color: colors.textMuted,
         marginTop: 2,
     },
     transactionAmount: {
-        fontSize: 14,
-        fontWeight: '600',
+        fontSize: 15,
+        fontWeight: 'bold',
     },
     emptyText: {
         fontSize: 14,
         color: colors.textMuted,
         textAlign: 'center',
-        paddingVertical: 24,
+        marginVertical: 12,
     },
 });

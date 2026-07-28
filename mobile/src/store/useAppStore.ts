@@ -20,7 +20,29 @@ interface ExpenseState {
     isLoading: boolean;
 }
 
+export interface PetIndividualState {
+    level: number;
+    exp: number;
+    coins: number;
+    feedCount: number;
+    playCount: number;
+    specialCount?: number;
+}
+
+export interface TamagotchiState {
+    petType: 'cat' | 'dog' | 'bunny' | 'panda' | 'fox' | 'koala';
+    petsData?: Record<string, PetIndividualState>;
+    level: number;
+    exp: number;
+    coins: number;
+    streakDays: number;
+    ghostState: boolean;
+}
+
 interface AppState extends AuthState, ExpenseState {
+    tamagotchi: TamagotchiState;
+    updateTamagotchi: (updates: Partial<TamagotchiState>) => void;
+
     // Auth actions
     setUser: (user: UserInfo | null) => void;
     setAuthenticated: (value: boolean) => void;
@@ -60,6 +82,27 @@ export const useAppStore = create<AppState>()(
             categories: [],
             monthlyTotal: 0,
             categorySpending: [],
+
+            // Tamagotchi Gamification State
+            tamagotchi: {
+                petType: 'cat',
+                petsData: {
+                    cat: { level: 1, exp: 0, coins: 100, feedCount: 0, playCount: 0 },
+                    dog: { level: 1, exp: 0, coins: 100, feedCount: 0, playCount: 0 },
+                    bunny: { level: 1, exp: 0, coins: 100, feedCount: 0, playCount: 0 },
+                    panda: { level: 1, exp: 0, coins: 100, feedCount: 0, playCount: 0 },
+                    fox: { level: 1, exp: 0, coins: 100, feedCount: 0, playCount: 0 },
+                    koala: { level: 1, exp: 0, coins: 100, feedCount: 0, playCount: 0 },
+                },
+                level: 1,
+                exp: 0,
+                coins: 100,
+                streakDays: 1,
+                ghostState: false,
+            },
+            updateTamagotchi: (updates) => set(state => ({
+                tamagotchi: { ...state.tamagotchi, ...updates }
+            })),
 
             // Global Settings
             currencySymbol: '₹',
@@ -169,8 +212,13 @@ export const useAppStore = create<AppState>()(
             partialize: (state) => ({
                 user: state.user,
                 currencySymbol: state.currencySymbol,
-                // Don't persist selectedMonth so we always start fresh
+                tamagotchi: state.tamagotchi,
             }),
+            onRehydrateStorage: () => (state, error) => {
+                if (error) {
+                    console.error('AsyncStorage rehydration error, executing fallback reset:', error);
+                }
+            },
         }
     )
 );
