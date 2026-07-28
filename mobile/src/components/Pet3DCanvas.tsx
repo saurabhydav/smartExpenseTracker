@@ -203,13 +203,26 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                 const armorMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9, roughness: 0.1 });
                 const crystalMat = new THREE.MeshStandardMaterial({ color: 0xa855f7, roughness: 0.1, transparent: true, opacity: 0.85 });
 
-                // Pedestal Shadow Disk
+                // Pedestal Shadow Disk & Neon Stage Ring
                 const shadowGeo = new THREE.CylinderGeometry(1.6, 1.6, 0.05, 32);
                 const shadowMat = new THREE.MeshBasicMaterial({ color: 0x020617, transparent: true, opacity: 0.4 });
                 const shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
                 shadowMesh.position.y = -1.25;
                 shadowMesh.name = "shadow";
                 petGroup.add(shadowMesh);
+
+                const ringGeo = new THREE.TorusGeometry(1.65, 0.035, 16, 48);
+                const ringMat = new THREE.MeshStandardMaterial({ 
+                    color: 0x38bdf8, 
+                    emissive: 0x0284c7, 
+                    emissiveIntensity: 0.8, 
+                    roughness: 0.1 
+                });
+                const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+                ringMesh.position.y = -1.23;
+                ringMesh.rotation.x = Math.PI * 0.5;
+                ringMesh.name = "stageRing";
+                petGroup.add(ringMesh);
 
                 // Stage 1: Cracked Eggshell Base
                 if (currentStage === 1) {
@@ -1007,11 +1020,16 @@ export const Pet3DCanvas: React.FC<Pet3DProps> = ({
                     petGroup.rotation.z = 0;
                 }
 
-                // Dynamic Ground Shadow Scaling
+                // Dynamic Ground Shadow Scaling & Stage Ring Rotation
                 const shadow = petGroup.getObjectByName("shadow");
                 if (shadow) {
                     const shadowScale = Math.max(0.4, 1.0 - (bounceY * 0.4));
                     shadow.scale.set(shadowScale, 1.0, shadowScale);
+                }
+
+                const stageRing = petGroup.getObjectByName("stageRing");
+                if (stageRing) {
+                    stageRing.rotation.z += 0.012;
                 }
 
                 const head = petGroup.getObjectByName("head");
