@@ -1,3 +1,10 @@
+pluginManagement {
+    includeBuild(file('../node_modules/expo-modules-autolinking/android/expo-gradle-plugin'))
+}
+plugins {
+    id 'expo-autolinking-settings-plugin'
+}
+
 rootProject.name = 'ExpenseTracker'
 
 apply from: file("../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesSettingsGradle(settings)
