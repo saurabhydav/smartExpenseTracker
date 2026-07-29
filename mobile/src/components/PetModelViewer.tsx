@@ -49,7 +49,7 @@ export const PetModelViewer: React.FC<PetModelViewerProps> = ({
         const width = gl.drawingBufferWidth;
         const height = gl.drawingBufferHeight;
 
-        // WebGL Renderer Setup
+        // WebGL Renderer Setup with high-precision antialiasing
         const renderer = new THREE.WebGLRenderer({ context: gl, antialias: true, alpha: true });
         renderer.setSize(width, height);
         renderer.setPixelRatio(Math.min(2, width / height));
@@ -58,30 +58,32 @@ export const PetModelViewer: React.FC<PetModelViewerProps> = ({
         const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
         camera.position.set(0, 1.2, 4.5);
 
-        // Ambient & Stage Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
+        // Anime Lighting Setup (Key Light + Cool Rim Light + Warm Fill Light)
+        const ambientLight = new THREE.AmbientLight(0xfff8e7, 0.9);
         scene.add(ambientLight);
 
-        const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-        dirLight.position.set(3, 5, 4);
-        scene.add(dirLight);
+        const keyLight = new THREE.DirectionalLight(0xffffff, 1.3);
+        keyLight.position.set(3, 5, 4);
+        scene.add(keyLight);
 
-        const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.7);
+        const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.8);
         rimLight.position.set(-3, 2, -4);
         scene.add(rimLight);
 
-        // Neon Stage Ring Platform
-        const ringGeo = new THREE.RingGeometry(1.2, 1.35, 32);
-        const ringMat = new THREE.MeshBasicMaterial({
-            color: 0x06b6d4,
-            side: THREE.DoubleSide,
-            transparent: true,
-            opacity: 0.85
-        });
-        const stageRing = new THREE.Mesh(ringGeo, ringMat);
-        stageRing.rotation.x = Math.PI / 2;
-        stageRing.position.y = -1.0;
-        scene.add(stageRing);
+        // Double Concentric Neon Anime Stage Rings
+        const ringGeo1 = new THREE.RingGeometry(1.15, 1.3, 32);
+        const ringMat1 = new THREE.MeshBasicMaterial({ color: 0x06b6d4, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
+        const stageRing1 = new THREE.Mesh(ringGeo1, ringMat1);
+        stageRing1.rotation.x = Math.PI / 2;
+        stageRing1.position.y = -1.0;
+        scene.add(stageRing1);
+
+        const ringGeo2 = new THREE.RingGeometry(1.35, 1.42, 32);
+        const ringMat2 = new THREE.MeshBasicMaterial({ color: 0xec4899, side: THREE.DoubleSide, transparent: true, opacity: 0.65 });
+        const stageRing2 = new THREE.Mesh(ringGeo2, ringMat2);
+        stageRing2.rotation.x = Math.PI / 2;
+        stageRing2.position.y = -1.0;
+        scene.add(stageRing2);
 
         // Dynamic Soft Contact Shadow Disc (Grounding the pet)
         const shadowGeo = new THREE.RingGeometry(0, 0.9, 32);
@@ -91,7 +93,7 @@ export const PetModelViewer: React.FC<PetModelViewerProps> = ({
         contactShadow.position.y = -0.99;
         scene.add(contactShadow);
 
-        // Species Color-Coded Particle Palette
+        // Species Color-Coded Anime Palette
         const speciesColors: Record<string, number> = {
             cat: 0xa855f7,      // Purple
             dog: 0xf59e0b,      // Amber
@@ -241,8 +243,9 @@ export const PetModelViewer: React.FC<PetModelViewerProps> = ({
             contactShadow.scale.set(shadowScale, shadowScale, 1.0);
             (contactShadow.material as THREE.MeshBasicMaterial).opacity = 0.45 * Math.max(0.2, 1.0 - bounceY * 0.4);
 
-            // Stage ring pulse
-            stageRing.rotation.z = elapsedTime * 0.4;
+            // Dual stage ring pulse
+            stageRing1.rotation.z = elapsedTime * 0.4;
+            stageRing2.rotation.z = -elapsedTime * 0.3;
 
             // Animate particles
             particles.forEach((p, idx) => {
@@ -259,12 +262,10 @@ export const PetModelViewer: React.FC<PetModelViewerProps> = ({
         return () => {
             cancelAnimationFrame(animationFrameId);
             renderer.dispose();
-            ringGeo.dispose();
-            ringMat.dispose();
-            shadowGeo.dispose();
-            shadowMat.dispose();
-            particleGeo.dispose();
-            particleMat.dispose();
+            ringGeo1.dispose(); ringMat1.dispose();
+            ringGeo2.dispose(); ringMat2.dispose();
+            shadowGeo.dispose(); shadowMat.dispose();
+            particleGeo.dispose(); particleMat.dispose();
         };
     };
 
@@ -273,7 +274,7 @@ export const PetModelViewer: React.FC<PetModelViewerProps> = ({
             {loading && (
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color="#06b6d4" />
-                    <Text style={styles.loadingText}>Loading 3D Native Engine...</Text>
+                    <Text style={styles.loadingText}>Loading 3D Anime Renderer...</Text>
                 </View>
             )}
             {error && (
@@ -326,3 +327,4 @@ const styles = StyleSheet.create({
 });
 
 export default PetModelViewer;
+
