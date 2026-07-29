@@ -74,10 +74,6 @@ export const PetModelViewer: React.FC<PetModelViewerProps> = ({
         stageRing.position.y = -1.0;
         scene.add(stageRing);
 
-        // Main Pet Group Container
-        const petGroup = new THREE.Group();
-        scene.add(petGroup);
-
         // Species Particle System (24 elements)
         const particleGeo = new THREE.SphereGeometry(0.04, 8, 8);
         const particleMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.7 });
@@ -91,6 +87,79 @@ export const PetModelViewer: React.FC<PetModelViewerProps> = ({
             );
             particles.push(p);
             scene.add(p);
+        }
+
+        // Main Pet Group Container
+        const petGroup = new THREE.Group();
+        scene.add(petGroup);
+
+        // Bone Socket Attachment Node Helper
+        const headSocket = new THREE.Group(); headSocket.name = "head_top"; headSocket.position.set(0, 1.6, 0); petGroup.add(headSocket);
+        const chestSocket = new THREE.Group(); chestSocket.name = "chest"; chestSocket.position.set(0, 0.4, 0.2); petGroup.add(chestSocket);
+        const backSocket = new THREE.Group(); backSocket.name = "back"; backSocket.position.set(0, 0.3, -0.4); petGroup.add(backSocket);
+        const handSocket = new THREE.Group(); handSocket.name = "right_hand"; handSocket.position.set(0.8, 0.2, 0.3); petGroup.add(handSocket);
+
+        // 3D Stage Accessory System (Stages 2 to 10)
+        if (stage >= 2) {
+            // Stage 2 Scarf
+            const scarfGeo = new THREE.TorusGeometry(0.55, 0.08, 8, 16);
+            const scarfMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.3 });
+            const scarfMesh = new THREE.Mesh(scarfGeo, scarfMat);
+            scarfMesh.rotation.x = Math.PI / 2;
+            chestSocket.add(scarfMesh);
+        }
+        if (stage >= 3) {
+            // Stage 3 Visor / Specs
+            const visorGeo = new THREE.BoxGeometry(0.6, 0.12, 0.15);
+            const visorMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.8, roughness: 0.2 });
+            const visorMesh = new THREE.Mesh(visorGeo, visorMat);
+            visorMesh.position.set(0, -0.2, 0.4);
+            headSocket.add(visorMesh);
+        }
+        if (stage >= 4) {
+            // Stage 4 Chest Plate Armor
+            const armorGeo = new THREE.CylinderGeometry(0.4, 0.45, 0.4, 12);
+            const armorMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.7, roughness: 0.3 });
+            const armorMesh = new THREE.Mesh(armorGeo, armorMat);
+            chestSocket.add(armorMesh);
+        }
+        if (stage >= 5) {
+            // Stage 5 Golden Crown
+            const crownGeo = new THREE.ConeGeometry(0.35, 0.35, 5);
+            const crownMat = new THREE.MeshStandardMaterial({ color: 0xeab308, metalness: 0.9, roughness: 0.1 });
+            const crownMesh = new THREE.Mesh(crownGeo, crownMat);
+            crownMesh.rotation.x = Math.PI;
+            crownMesh.position.y = 0.2;
+            headSocket.add(crownMesh);
+        }
+        if (stage >= 7) {
+            // Stage 7 Wings
+            const wingGeo = new THREE.ConeGeometry(0.3, 1.2, 4);
+            const wingMat = new THREE.MeshStandardMaterial({ color: 0x818cf8, transparent: true, opacity: 0.9 });
+            const leftWing = new THREE.Mesh(wingGeo, wingMat); leftWing.position.set(-0.6, 0.4, 0); leftWing.rotation.z = 0.8;
+            const rightWing = new THREE.Mesh(wingGeo, wingMat); rightWing.position.set(0.6, 0.4, 0); rightWing.rotation.z = -0.8;
+            backSocket.add(leftWing); backSocket.add(rightWing);
+        }
+        if (stage >= 8) {
+            // Stage 8 Archmage Staff
+            const staffGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.8, 8);
+            const staffMat = new THREE.MeshStandardMaterial({ color: 0xec4899, metalness: 0.5 });
+            const staffMesh = new THREE.Mesh(staffGeo, staffMat);
+            const orbGeo = new THREE.SphereGeometry(0.15, 12, 12);
+            const orbMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x38bdf8, emissiveIntensity: 0.8 });
+            const orbMesh = new THREE.Mesh(orbGeo, orbMat);
+            orbMesh.position.y = 0.9;
+            staffMesh.add(orbMesh);
+            handSocket.add(staffMesh);
+        }
+        if (stage >= 9) {
+            // Stage 9 Celestial Halo
+            const haloGeo = new THREE.TorusGeometry(0.45, 0.04, 8, 24);
+            const haloMat = new THREE.MeshStandardMaterial({ color: 0xfef08a, emissive: 0xfef08a, emissiveIntensity: 0.9 });
+            const haloMesh = new THREE.Mesh(haloGeo, haloMat);
+            haloMesh.rotation.x = Math.PI / 2;
+            haloMesh.position.y = 0.5;
+            headSocket.add(haloMesh);
         }
 
         setLoading(false);
