@@ -70,20 +70,13 @@ export const PetModelViewer: React.FC<PetModelViewerProps> = ({
         rimLight.position.set(-3, 2, -4);
         scene.add(rimLight);
 
-        // Double Concentric Neon Anime Stage Rings
+        // Clean Minimal Stage Ring Platform
         const ringGeo1 = new THREE.RingGeometry(1.15, 1.3, 32);
         const ringMat1 = new THREE.MeshBasicMaterial({ color: 0x06b6d4, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
         const stageRing1 = new THREE.Mesh(ringGeo1, ringMat1);
         stageRing1.rotation.x = Math.PI / 2;
         stageRing1.position.y = -1.0;
         scene.add(stageRing1);
-
-        const ringGeo2 = new THREE.RingGeometry(1.35, 1.42, 32);
-        const ringMat2 = new THREE.MeshBasicMaterial({ color: 0xec4899, side: THREE.DoubleSide, transparent: true, opacity: 0.65 });
-        const stageRing2 = new THREE.Mesh(ringGeo2, ringMat2);
-        stageRing2.rotation.x = Math.PI / 2;
-        stageRing2.position.y = -1.0;
-        scene.add(stageRing2);
 
         // Dynamic Soft Contact Shadow Disc (Grounding the pet)
         const shadowGeo = new THREE.RingGeometry(0, 0.9, 32);
@@ -243,9 +236,8 @@ export const PetModelViewer: React.FC<PetModelViewerProps> = ({
             contactShadow.scale.set(shadowScale, shadowScale, 1.0);
             (contactShadow.material as THREE.MeshBasicMaterial).opacity = 0.45 * Math.max(0.2, 1.0 - bounceY * 0.4);
 
-            // Dual stage ring pulse
+            // Stage ring pulse
             stageRing1.rotation.z = elapsedTime * 0.4;
-            stageRing2.rotation.z = -elapsedTime * 0.3;
 
             // Animate particles
             particles.forEach((p, idx) => {
@@ -263,7 +255,6 @@ export const PetModelViewer: React.FC<PetModelViewerProps> = ({
             cancelAnimationFrame(animationFrameId);
             renderer.dispose();
             ringGeo1.dispose(); ringMat1.dispose();
-            ringGeo2.dispose(); ringMat2.dispose();
             shadowGeo.dispose(); shadowMat.dispose();
             particleGeo.dispose(); particleMat.dispose();
         };
