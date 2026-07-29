@@ -6,7 +6,7 @@ import { WebView } from 'react-native-webview';
 import THREE_BASE64 from '../assets/threeMinJs';
 
 export interface Pet3DProps {
-    speciesId: 'cat' | 'dog' | 'bunny' | 'panda' | 'fox' | 'koala';
+    speciesId: 'cat' | 'dog' | 'bunny' | 'panda' | 'fox' | 'koala' | 'owl' | 'turtle' | 'hedgehog' | 'axolotl';
     stageLevel: number;
     primaryColor: string;
     secondaryColor: string;

@@ -30,7 +30,7 @@ export interface PetIndividualState {
 }
 
 export interface TamagotchiState {
-    petType: 'cat' | 'dog' | 'bunny' | 'panda' | 'fox' | 'koala';
+    petType: 'cat' | 'dog' | 'bunny' | 'panda' | 'fox' | 'koala' | 'owl' | 'turtle' | 'hedgehog' | 'axolotl';
     petsData?: Record<string, PetIndividualState>;
     level: number;
     exp: number;

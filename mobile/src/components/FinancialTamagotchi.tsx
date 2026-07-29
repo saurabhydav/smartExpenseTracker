@@ -4,12 +4,13 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useAppStore } from '../store';
 import { colors } from '../utils';
 import { Pet3DCanvas } from './Pet3DCanvas';
+import { PetModelViewer } from './PetModelViewer';
 
 // ============================================
 // ORIGINAL ELEMENTAL PET SPECIES DEFINITIONS
 // ============================================
 export interface PetSpeciesDef {
-    id: 'cat' | 'dog' | 'bunny' | 'panda' | 'fox' | 'koala';
+    id: 'cat' | 'dog' | 'bunny' | 'panda' | 'fox' | 'koala' | 'owl' | 'turtle' | 'hedgehog' | 'axolotl';
     name: string;
     elementalClass: string;
     emoji: string;
@@ -200,6 +201,122 @@ export const SPECIES_KOALA: PetSpeciesDef = {
     ]
 };
 
+export const SPECIES_OWL: PetSpeciesDef = {
+    id: 'owl',
+    name: 'Hoot the Owl',
+    elementalClass: 'Astral Nightwing Sage',
+    emoji: '🦉',
+    speciality: 'Night Analytics & Audit',
+    specialAbilityName: 'Moonlight Insight',
+    specialAbilityEmoji: '🌙',
+    specialAbilityDesc: '+40 Coins • Night Gaze',
+    coinReward: 40,
+    expReward: 25,
+    primaryColor: '#6366f1',
+    secondaryColor: '#818cf8',
+    bellyColor: '#e0e7ff',
+    earType: 'owl',
+    evolutions: [
+        { level: 1, title: 'Fledgling Owlet', badge: '🐣 Stage 1 Owlet', scale: 0.70 },
+        { level: 2, title: 'Feather Scholar', badge: '🎓 Stage 2 Scholar Specs', scale: 0.77 },
+        { level: 3, title: 'Starlight Sentinel', badge: '⭐ Stage 3 Star Amulet', scale: 0.84 },
+        { level: 4, title: 'Nightwing Ranger', badge: '🛡️ Stage 4 Ranger Cloak', scale: 0.91 },
+        { level: 5, title: 'Astral Archmage', badge: '👑 Stage 5 Astral Crown', scale: 0.98 },
+        { level: 6, title: 'Cosmic Oracle', badge: '⚡ Stage 6 Cosmic Wings', scale: 1.06 },
+        { level: 7, title: 'Moonlight Archon', badge: '🦅 Stage 7 MOON WINGS MORPH', scale: 1.14 },
+        { level: 8, title: 'Celestial Sage', badge: '🔮 Stage 8 Starlight Staff', scale: 1.21 },
+        { level: 9, title: 'Nirvana Sovereign', badge: '😇 Stage 9 Divine Feather Halo', scale: 1.28 },
+        { level: 10, title: 'ASTRAL SAGE OWL', badge: '🌌 Stage 10 NIGHT TITAN FORM', scale: 1.36 },
+    ]
+};
+
+export const SPECIES_TURTLE: PetSpeciesDef = {
+    id: 'turtle',
+    name: 'Shelly the Turtle',
+    elementalClass: 'Ancient Obsidian Fortress',
+    emoji: '🐢',
+    speciality: 'Patience & Long-term Wealth',
+    specialAbilityName: 'Obsidian Shield',
+    specialAbilityEmoji: '🛡️',
+    specialAbilityDesc: '+45 Coins • Iron Defense',
+    coinReward: 45,
+    expReward: 30,
+    primaryColor: '#10b981',
+    secondaryColor: '#34d399',
+    bellyColor: '#d1fae5',
+    earType: 'turtle',
+    evolutions: [
+        { level: 1, title: 'Shell Hatchling', badge: '🐣 Stage 1 Hatchling', scale: 0.70 },
+        { level: 2, title: 'Pebble Guardian', badge: '🎀 Stage 2 Pebble Shell', scale: 0.77 },
+        { level: 3, title: 'Jade Defender', badge: '🎓 Stage 3 Jade Plate', scale: 0.84 },
+        { level: 4, title: 'Obsidian Knight', badge: '🛡️ Stage 4 Obsidian Armor', scale: 0.91 },
+        { level: 5, title: 'Fortress Sentinel', badge: '👑 Stage 5 Fortress Helm', scale: 0.98 },
+        { level: 6, title: 'Titan Shell', badge: '⚡ Stage 6 Spiked Shell', scale: 1.06 },
+        { level: 7, title: 'Dragon Turtle', badge: '🦅 Stage 7 DRAGON TURTLE MORPH', scale: 1.14 },
+        { level: 8, title: 'Ancient Aegis', badge: '🔮 Stage 8 Aegis Shield', scale: 1.21 },
+        { level: 9, title: 'Immortal Bastion', badge: '😇 Stage 9 Bastion Halo', scale: 1.28 },
+        { level: 10, title: 'OBSIDIAN FORTRESS TURTLE', badge: '🌌 Stage 10 EARTH TITAN FORM', scale: 1.36 },
+    ]
+};
+
+export const SPECIES_HEDGEHOG: PetSpeciesDef = {
+    id: 'hedgehog',
+    name: 'Sonic the Hedgehog',
+    elementalClass: 'Lightning Quill Sprinter',
+    emoji: '🦔',
+    speciality: 'Speed Savings & Fast Budgeting',
+    specialAbilityName: 'Quill Spin Dash',
+    specialAbilityEmoji: '⚡',
+    specialAbilityDesc: '+35 Coins • Speed Spin',
+    coinReward: 35,
+    expReward: 20,
+    primaryColor: '#06b6d4',
+    secondaryColor: '#22d3ee',
+    bellyColor: '#cffaff',
+    earType: 'hedgehog',
+    evolutions: [
+        { level: 1, title: 'Tiny Quill', badge: '🐣 Stage 1 Quill Pup', scale: 0.70 },
+        { level: 2, title: 'Spike Runner', badge: '🎀 Stage 2 Speed Boots', scale: 0.77 },
+        { level: 3, title: 'Sonic Dash', badge: '🎓 Stage 3 Visor Specs', scale: 0.84 },
+        { level: 4, title: 'Thunder Quill', badge: '🛡️ Stage 4 Thunder Armor', scale: 0.91 },
+        { level: 5, title: 'Volt Champion', badge: '👑 Stage 5 Lightning Crown', scale: 0.98 },
+        { level: 6, title: 'Overdrive Sprinter', badge: '⚡ Stage 6 Aura Boost', scale: 1.06 },
+        { level: 7, title: 'Hyper Sonic', badge: '🦅 Stage 7 HYPER SPEED MORPH', scale: 1.14 },
+        { level: 8, title: 'Plasma Sage', badge: '🔮 Stage 8 Plasma Rod', scale: 1.21 },
+        { level: 9, title: 'Lightspeed Sovereign', badge: '😇 Stage 9 Lightning Halo', scale: 1.28 },
+        { level: 10, title: 'LIGHTNING SPRINTER HEDGEHOG', badge: '🌌 Stage 10 SPEED TITAN FORM', scale: 1.36 },
+    ]
+};
+
+export const SPECIES_AXOLOTL: PetSpeciesDef = {
+    id: 'axolotl',
+    name: 'Loti the Axolotl',
+    elementalClass: 'Tidepool Regeneration Spirit',
+    emoji: '🦎',
+    speciality: 'Emergency Fund Regeneration',
+    specialAbilityName: 'Hydro Healing Surge',
+    specialAbilityEmoji: '💧',
+    specialAbilityDesc: '+50 Coins • Aqua Heal',
+    coinReward: 50,
+    expReward: 30,
+    primaryColor: '#ec4899',
+    secondaryColor: '#f472b6',
+    bellyColor: '#fce7f3',
+    earType: 'axolotl',
+    evolutions: [
+        { level: 1, title: 'Pink Frill Fry', badge: '🐣 Stage 1 Frill Fry', scale: 0.70 },
+        { level: 2, title: 'Aqua Paddle', badge: '🎀 Stage 2 Aqua Scarf', scale: 0.77 },
+        { level: 3, title: 'Tide Scholar', badge: '🎓 Stage 3 Tide Goggles', scale: 0.84 },
+        { level: 4, title: 'Coral Guardian', badge: '🛡️ Stage 4 Coral Armor', scale: 0.91 },
+        { level: 5, title: 'Oceanic Monarch', badge: '👑 Stage 5 Pearl Crown', scale: 0.98 },
+        { level: 6, title: 'Hydro Dragon', badge: '⚡ Stage 6 6-Frill Dragon Morph', scale: 1.06 },
+        { level: 7, title: 'Leviathan Spirit', badge: '🦅 Stage 7 LEVIATHAN MORPH', scale: 1.14 },
+        { level: 8, title: 'Regeneration Oracle', badge: '🔮 Stage 8 Trident Staff', scale: 1.21 },
+        { level: 9, title: 'Tidepool Deity', badge: '😇 Stage 9 Water Halo', scale: 1.28 },
+        { level: 10, title: 'TIDEPOOL REGEN AXOLOTL', badge: '🌌 Stage 10 WATER TITAN FORM', scale: 1.36 },
+    ]
+};
+
 export const ALL_PET_SPECIES: PetSpeciesDef[] = [
     SPECIES_CAT,
     SPECIES_DOG,
@@ -207,6 +324,10 @@ export const ALL_PET_SPECIES: PetSpeciesDef[] = [
     SPECIES_PANDA,
     SPECIES_FOX,
     SPECIES_KOALA,
+    SPECIES_OWL,
+    SPECIES_TURTLE,
+    SPECIES_HEDGEHOG,
+    SPECIES_AXOLOTL,
 ];
 
 const DIALOG_QUOTES = [
