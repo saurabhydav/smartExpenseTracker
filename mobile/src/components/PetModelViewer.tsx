@@ -22,6 +22,8 @@ export const PetModelViewer: React.FC<PetModelViewerProps> = ({
     const [error, setError] = useState(false);
     const rotationY = useRef(0);
     const rotationX = useRef(0);
+    const velocityY = useRef(0);
+    const velocityX = useRef(0);
     const glRef = useRef<any>(null);
 
     const panResponder = useRef(
@@ -29,9 +31,16 @@ export const PetModelViewer: React.FC<PetModelViewerProps> = ({
             onStartShouldSetPanResponder: () => true,
             onMoveShouldSetPanResponder: () => true,
             onPanResponderMove: (_, gestureState) => {
-                rotationY.current += gestureState.vx * 0.05;
-                rotationX.current = Math.max(-0.4, Math.min(0.4, rotationX.current + gestureState.vy * 0.03));
+                const dy = gestureState.vx * 0.06;
+                const dx = gestureState.vy * 0.04;
+                rotationY.current += dy;
+                rotationX.current = Math.max(-0.4, Math.min(0.4, rotationX.current + dx));
+                velocityY.current = dy;
+                velocityX.current = dx;
             },
+            onPanResponderRelease: () => {
+                // Velocity inertia on touch release
+            }
         })
     ).current;
 
@@ -57,8 +66,8 @@ export const PetModelViewer: React.FC<PetModelViewerProps> = ({
         dirLight.position.set(3, 5, 4);
         scene.add(dirLight);
 
-        const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.6);
-        rimLight.position.set(-3, -2, -4);
+        const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.7);
+        rimLight.position.set(-3, 2, -4);
         scene.add(rimLight);
 
         // Neon Stage Ring Platform
@@ -74,9 +83,32 @@ export const PetModelViewer: React.FC<PetModelViewerProps> = ({
         stageRing.position.y = -1.0;
         scene.add(stageRing);
 
+        // Dynamic Soft Contact Shadow Disc (Grounding the pet)
+        const shadowGeo = new THREE.RingGeometry(0, 0.9, 32);
+        const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.45, side: THREE.DoubleSide });
+        const contactShadow = new THREE.Mesh(shadowGeo, shadowMat);
+        contactShadow.rotation.x = Math.PI / 2;
+        contactShadow.position.y = -0.99;
+        scene.add(contactShadow);
+
+        // Species Color-Coded Particle Palette
+        const speciesColors: Record<string, number> = {
+            cat: 0xa855f7,      // Purple
+            dog: 0xf59e0b,      // Amber
+            fox: 0xf97316,      // Flame Orange
+            bunny: 0xec4899,    // Pink
+            panda: 0x10b981,    // Emerald Green
+            koala: 0x64748b,    // Slate Gray
+            owl: 0x6366f1,      // Indigo
+            turtle: 0x06b6d4,   // Teal
+            hedgehog: 0xeab308, // Gold
+            axolotl: 0x06b6d4   // Cyan
+        };
+        const pColor = speciesColors[species.toLowerCase()] || 0xf59e0b;
+
         // Species Particle System (24 elements)
         const particleGeo = new THREE.SphereGeometry(0.04, 8, 8);
-        const particleMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.7 });
+        const particleMat = new THREE.MeshBasicMaterial({ color: pColor, transparent: true, opacity: 0.75 });
         const particles: THREE.Mesh[] = [];
         for (let i = 0; i < 24; i++) {
             const p = new THREE.Mesh(particleGeo, particleMat);
@@ -173,13 +205,41 @@ export const PetModelViewer: React.FC<PetModelViewerProps> = ({
 
             const elapsedTime = clock.getElapsedTime();
 
+            // Inertial friction damping physics
+            rotationY.current += velocityY.current;
+            rotationX.current = Math.max(-0.4, Math.min(0.4, rotationX.current + velocityX.current));
+            velocityY.current *= 0.92;
+            velocityX.current *= 0.92;
+
             // Smooth rotation interpolation
             petGroup.rotation.y = rotationY.current;
             petGroup.rotation.x = rotationX.current;
 
-            // Breathing / Idle bounce
+            // Weight shift Z-roll
+            petGroup.rotation.z = Math.sin(elapsedTime * 0.9) * 0.025;
+
+            // Breathing & Idle bounce
             const bounceFreq = emotion === 'happy' ? 3 : 1.5;
-            petGroup.position.y = Math.sin(elapsedTime * bounceFreq) * 0.08;
+            const bounceY = Math.sin(elapsedTime * bounceFreq) * 0.08;
+            petGroup.position.y = bounceY;
+
+            // Volume-Preserving Squash & Stretch (Sy * Sx * Sz = Constant Volume)
+            const sy = 1 + bounceY * 0.8;
+            const sxz = 1 / Math.sqrt(sy);
+            petGroup.scale.set(sxz, sy, sxz);
+
+            // Living Chest Micro-Breathing
+            chestSocket.scale.setScalar(1 + Math.sin(elapsedTime * 2.2) * 0.03);
+
+            // Periodic Eye Blinking (every 4.0 seconds for 0.15s)
+            const blinkCycle = elapsedTime % 4.0;
+            const isBlinking = blinkCycle < 0.15;
+            headSocket.scale.y = isBlinking ? 0.1 : 1.0;
+
+            // Dynamic Soft Contact Shadow scaling & opacity falloff
+            const shadowScale = Math.max(0.4, 1.0 - bounceY * 0.4);
+            contactShadow.scale.set(shadowScale, shadowScale, 1.0);
+            (contactShadow.material as THREE.MeshBasicMaterial).opacity = 0.45 * Math.max(0.2, 1.0 - bounceY * 0.4);
 
             // Stage ring pulse
             stageRing.rotation.z = elapsedTime * 0.4;
@@ -201,6 +261,8 @@ export const PetModelViewer: React.FC<PetModelViewerProps> = ({
             renderer.dispose();
             ringGeo.dispose();
             ringMat.dispose();
+            shadowGeo.dispose();
+            shadowMat.dispose();
             particleGeo.dispose();
             particleMat.dispose();
         };
