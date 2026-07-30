@@ -5,6 +5,7 @@ import { useAppStore } from '../store';
 import { colors } from '../utils';
 import { Pet3DCanvas } from './Pet3DCanvas';
 import { PetModelViewer } from './PetModelViewer';
+import { getModelPathForSpecies } from '../services/PetAssetResolver';
 
 // ============================================
 // ORIGINAL ELEMENTAL PET SPECIES DEFINITIONS
@@ -657,14 +658,12 @@ export default function FinancialTamagotchi() {
                         ],
                     }}
                 >
-                    <Pet3DCanvas
-                        speciesId={speciesDef.id}
-                        stageLevel={level}
-                        primaryColor={speciesDef.primaryColor}
-                        secondaryColor={speciesDef.secondaryColor}
-                        bellyColor={speciesDef.bellyColor}
-                        emotion={emotion}
-                        isBlinking={isBlinking}
+                    <PetModelViewer
+                        species={speciesDef.id}
+                        stage={level}
+                        emotion={emotion === 'idle' ? 'neutral' : 'happy'}
+                        glbUri={getModelPathForSpecies(speciesDef.id)}
+                        onLoadError={() => console.warn(`[FinancialTamagotchi] GLTF asset load error for species '${speciesDef.id}'`)}
                     />
                 </Animated.View>
             </View>
