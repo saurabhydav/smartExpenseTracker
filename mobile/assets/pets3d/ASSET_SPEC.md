@@ -66,7 +66,7 @@
 - **Silhouette**: Domed protective shell, short stubby legs, gentle smiling face.
 - **Signature Idle**: Retract head slightly into shell and slow blink.
 
-### 9. 🦔 Sonic (Hedgehog)
+### 9. 🦔 Quill (Hedgehog)
 - **Archetype**: Speed & Agility archetype.
 - **Silhouette**: Round spiky back quills, small pointed snout, tiny paws.
 - **Signature Idle**: Quick sniff and roll-into-a-ball spin.

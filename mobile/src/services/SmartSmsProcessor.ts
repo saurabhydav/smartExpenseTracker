@@ -365,8 +365,9 @@ export async function processSmartSms(
 
     // Step 4.5: Update Pet Gamification (SMS auto-capture wiring)
     try {
-        const { processTransactionGamification, applyGamificationUpdate } = require('./TamagotchiService');
-        const gamification = processTransactionGamification(parsed.type, parsed.amount, 'SMS Transaction', false);
+        const { processTransactionGamification, applyGamificationUpdate, checkCategoryOverBudget } = require('./TamagotchiService');
+        const isOverBudget = categoryId != null ? await checkCategoryOverBudget(currentUserId, categoryId) : false;
+        const gamification = processTransactionGamification(parsed.type, parsed.amount, 'SMS Transaction', isOverBudget);
         applyGamificationUpdate(gamification.expDelta, gamification.coinDelta);
     } catch (gErr) {
         console.warn('[SmartSmsProcessor] Pet gamification update skipped:', gErr);
