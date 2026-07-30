@@ -18,6 +18,10 @@ jest.mock('react-native-fs', () => ({
     mkdir: jest.fn(),
 }));
 
+jest.mock('react-native-device-info', () => ({
+    getTotalMemory: jest.fn().mockResolvedValue(4 * 1024 * 1024 * 1024),
+}));
+
 jest.mock('react-native', () => ({
     NativeModules: {},
     Platform: { OS: 'android', select: jest.fn(obj => obj.android) },

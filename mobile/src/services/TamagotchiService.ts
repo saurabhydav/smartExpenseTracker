@@ -1,8 +1,46 @@
 import { useAppStore, type TamagotchiState } from '../store';
+import { getDatabase, getCategoryById } from '../database';
 
 // Logarithmic EXP progression curve (Step 61)
 export function getRequiredExp(level: number): number {
     return Math.floor(100 * Math.pow(1.15, level - 1));
+}
+
+/**
+ * Real over-budget check, replacing the previous hardcoded `false` passed at
+ * every call site. Budgets in this app are set per-category (categories.budget_limit,
+ * nullable) rather than as one flat monthly number, so this looks up the specific
+ * category's limit and compares it against that category's actual month-to-date
+ * spend. A category with no budget set returns false — no budget means nothing
+ * to be "over."
+ */
+export async function checkCategoryOverBudget(userId: number, categoryId: number): Promise<boolean> {
+    try {
+        const category = await getCategoryById(categoryId);
+        if (!category || category.budgetLimit == null) {
+            return false;
+        }
+
+        const db = getDatabase();
+        const now = new Date();
+        const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+
+        const [result] = await db.executeSql(
+            `SELECT COALESCE(SUM(amount), 0) as total
+             FROM transactions
+             WHERE user_id = ? AND category_id = ? AND type = 'debit' AND date >= ?`,
+            [userId, categoryId, monthStart]
+        );
+
+        const monthToDateSpend = result.rows.item(0).total as number;
+        return monthToDateSpend > category.budgetLimit;
+    } catch (err) {
+        // A failed lookup shouldn't block a transaction from saving or crash
+        // the gamification flow — default to "not over budget" and let the
+        // pet's mood catch up on the next successful check.
+        console.warn('[TamagotchiService] checkCategoryOverBudget failed, defaulting to false:', err);
+        return false;
+    }
 }
 
 // Evaluate expense transaction and calculate gamification EXP / Coin adjustments (Steps 62 & 63)

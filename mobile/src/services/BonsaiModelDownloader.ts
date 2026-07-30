@@ -1,6 +1,7 @@
 // Real Multi-Model Downloader for Bonsai LLMs (Standard Q4_K_M GGUF format)
 
 import RNFS from 'react-native-fs';
+import DeviceInfo from 'react-native-device-info';
 
 export interface BonsaiDownloadProgress {
     bytesWritten: number;
@@ -139,6 +140,18 @@ class BonsaiModelDownloaderEngine {
         }
     }
 
+    async getDeviceTotalRamGB(): Promise<number> {
+        try {
+            const totalBytes = await DeviceInfo.getTotalMemory();
+            return totalBytes / (1024 * 1024 * 1024);
+        } catch (err) {
+            console.warn('[BonsaiModelDownloader] Could not read device RAM, assuming 3GB (conservative default):', err);
+            // If we can't detect real RAM, assume a conservative low-end value
+            // rather than silently letting every model through unchecked.
+            return 3.0;
+        }
+    }
+
     async checkModelCompatibility(model: BonsaiModelMetadata): Promise<{ isCompatible: boolean; reason?: string }> {
         const freeStorage = await this.getFreeStorageMB();
         if (freeStorage < model.minFreeStorageMB) {
@@ -148,11 +161,16 @@ class BonsaiModelDownloaderEngine {
             };
         }
 
-        // Real RAM safety check for heavy 3B models (>4.0GB RAM requirement)
-        if (model.minRamGB > 4.0) {
+        // Real device RAM check. We require meaningfully more total RAM than
+        // the model's stated minimum (1.3x buffer) since the OS, other apps,
+        // and the rest of this app all compete for the same physical memory
+        // that a model load doesn't get exclusive access to.
+        const totalRamGB = await this.getDeviceTotalRamGB();
+        const requiredWithBuffer = model.minRamGB * 1.3;
+        if (totalRamGB < requiredWithBuffer) {
             return {
-                isCompatible: true,
-                reason: `High memory footprint (${model.minRamGB}GB RAM required). May cause background app restarts on 3-4GB devices.`
+                isCompatible: false,
+                reason: `This model needs a device with roughly ${requiredWithBuffer.toFixed(1)}GB+ RAM to run reliably. Your device has about ${totalRamGB.toFixed(1)}GB — a smaller model is a safer choice here.`
             };
         }
 
